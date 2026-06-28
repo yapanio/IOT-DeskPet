@@ -99,42 +99,42 @@ public:
 
     case DANGER_HUMID:
       eyes.open();
-      eyes.setMood(TIRED);
+      eyes.setMood(RE_TIRED);
       eyes.setSweat(true);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(DEFAULT);
+      eyes.setPosition(RE_DEFAULT);
       break;
 
     case WARNING_HOT:
       eyes.open();
-      eyes.setMood(TIRED);
+      eyes.setMood(RE_TIRED);
       eyes.setSweat(false);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(DEFAULT);
+      eyes.setPosition(RE_DEFAULT);
       break;
 
     case WARNING_COLD:
       eyes.open();
-      eyes.setMood(TIRED);
+      eyes.setMood(RE_TIRED);
       eyes.setSweat(false);
       eyes.setHFlicker(true, 2); // Shiver!
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(DEFAULT);
+      eyes.setPosition(RE_DEFAULT);
       break;
 
     case WARNING_DARK:
       eyes.open();
-      eyes.setMood(ANGRY); // Squinting
+      eyes.setMood(RE_ANGRY); // Squinting
       eyes.setSweat(false);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(N); // Look up
+      eyes.setPosition(RE_N); // Look up
       break;
 
     case SLEEP_MODE:
@@ -143,12 +143,12 @@ public:
       eyes.setHFlicker(false);
       eyes.setAutoblinker(false);
       eyes.setIdleMode(false);
-      eyes.setPosition(DEFAULT);
+      eyes.setPosition(RE_DEFAULT);
       break;
 
     case NORMAL_HAPPY:
       eyes.open();
-      eyes.setMood(HAPPY);
+      eyes.setMood(RE_HAPPY);
       eyes.setSweat(false);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);

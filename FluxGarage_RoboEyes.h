@@ -30,25 +30,25 @@ uint8_t BGCOLOR = 0;   // background and overlays
 uint8_t MAINCOLOR = 1; // drawings
 
 // For mood type switch
-#define DEFAULT 0
-#define TIRED 1
-#define ANGRY 2
-#define HAPPY 3
+#define RE_DEFAULT 0
+#define RE_TIRED 1
+#define RE_ANGRY 2
+#define RE_HAPPY 3
 
 // For turning things on or off
-#define ON 1
-#define OFF 0
+#define RE_ON 1
+#define RE_OFF 0
 
 // For switch "predefined positions"
-#define N 1  // north, top center
-#define NE 2 // north-east, top right
-#define E 3  // east, middle right
-#define SE 4 // south-east, bottom right
-#define S 5  // south, bottom center
-#define SW 6 // south-west, bottom left
-#define W 7  // west, middle left
-#define NW 8 // north-west, top left
-// for middle center set "DEFAULT"
+#define RE_N 1  // north, top center
+#define RE_NE 2 // north-east, top right
+#define RE_E 3  // east, middle right
+#define RE_SE 4 // south-east, bottom right
+#define RE_S 5  // south, bottom center
+#define RE_SW 6 // south-west, bottom left
+#define RE_W 7  // west, middle left
+#define RE_NW 8 // north-west, top left
+// for middle center set "RE_DEFAULT"
 
 // Constructor: takes a reference to the active Adafruit display object (e.g.,
 // Adafruit_SSD1327) Eg: roboEyes<Adafruit_SSD1327> = eyes(display);
@@ -293,17 +293,17 @@ public:
   // Set mood expression
   void setMood(unsigned char mood) {
     switch (mood) {
-    case TIRED:
+    case RE_TIRED:
       tired = 1;
       angry = 0;
       happy = 0;
       break;
-    case ANGRY:
+    case RE_ANGRY:
       tired = 0;
       angry = 1;
       happy = 0;
       break;
-    case HAPPY:
+    case RE_HAPPY:
       tired = 0;
       angry = 0;
       happy = 1;
@@ -319,42 +319,42 @@ public:
   // Set predefined position
   void setPosition(unsigned char position) {
     switch (position) {
-    case N:
+    case RE_N:
       // North, top center
       eyeLxNext = getScreenConstraint_X() / 2;
       eyeLyNext = 0;
       break;
-    case NE:
+    case RE_NE:
       // North-east, top right
       eyeLxNext = getScreenConstraint_X();
       eyeLyNext = 0;
       break;
-    case E:
+    case RE_E:
       // East, middle right
       eyeLxNext = getScreenConstraint_X();
       eyeLyNext = getScreenConstraint_Y() / 2;
       break;
-    case SE:
+    case RE_SE:
       // South-east, bottom right
       eyeLxNext = getScreenConstraint_X();
       eyeLyNext = getScreenConstraint_Y();
       break;
-    case S:
+    case RE_S:
       // South, bottom center
       eyeLxNext = getScreenConstraint_X() / 2;
       eyeLyNext = getScreenConstraint_Y();
       break;
-    case SW:
+    case RE_SW:
       // South-west, bottom left
       eyeLxNext = 0;
       eyeLyNext = getScreenConstraint_Y();
       break;
-    case W:
+    case RE_W:
       // West, middle left
       eyeLxNext = 0;
       eyeLyNext = getScreenConstraint_Y() / 2;
       break;
-    case NW:
+    case RE_NW:
       // North-west, top left
       eyeLxNext = 0;
       eyeLyNext = 0;

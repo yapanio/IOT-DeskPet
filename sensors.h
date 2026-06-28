@@ -24,6 +24,12 @@ private:
       2000; // Read temperature/humidity every 2 seconds
   const unsigned long lightInterval = 1000; // Read light sensor every 1 second
 
+  // Mock variables for simulation mode
+  bool mockMode = false;
+  float mockTemp = 25.0;
+  float mockHumid = 55.0;
+  float mockLux = 350.0;
+
 public:
   Sensors(int dhtPin) : dht(dhtPin, DHTTYPE) {}
 
@@ -39,7 +45,24 @@ public:
     }
   }
 
+  void setMock(bool enable, float temp, float humid, float lux) {
+    mockMode = enable;
+    mockTemp = temp;
+    mockHumid = humid;
+    mockLux = lux;
+  }
+
+  bool isMockEnabled() const { return mockMode; }
+
   void update() {
+    if (mockMode) {
+      temperature = mockTemp;
+      humidity = mockHumid;
+      heatIndex = dht.computeHeatIndex(temperature, humidity, false);
+      lightLux = mockLux;
+      return;
+    }
+
     unsigned long currentMillis = millis();
 
     // Non-blocking DHT11 reading

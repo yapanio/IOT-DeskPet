@@ -7,6 +7,7 @@
 #include "robot_servo.h"
 #include "actuators.h"
 #include "emote.h"
+#include "blynk_service.h"
 
 // GPIO Pin Definitions
 #define TOUCH_PIN 15
@@ -21,6 +22,7 @@ private:
     RobotServo servo;
     Actuators actuators;
     Emote emote;
+    BlynkService blynk;
 
     RobotState currentState = NORMAL_HAPPY;
     
@@ -31,6 +33,7 @@ private:
     // Debounce for touch sensor
     bool touchActive = false;
     unsigned long lastTouchTime = 0;
+    bool mockTouchTriggered = false;
 
 public:
     Controller() : 
@@ -52,6 +55,7 @@ public:
         servo.begin();
         actuators.begin();
         emote.begin(&sensors);
+        blynk.begin();
 
         // Set initial state
         servo.setState(currentState);
@@ -65,6 +69,9 @@ public:
     }
 
     void update() {
+        // Read serial commands for simulation mode
+        handleSerialCommands();
+
         // 1. Update sensor data (non-blocking)
         sensors.update();
 
@@ -81,6 +88,15 @@ public:
         servo.update();
         actuators.update();
         emote.update();
+
+        // 6. Update Blynk
+        blynk.update(
+            sensors.getTemperature(),
+            sensors.getHumidity(),
+            sensors.getHeatIndex(),
+            sensors.getLightLux(),
+            stateToString(currentState)
+        );
     }
 
 private:
@@ -179,8 +195,10 @@ private:
     void updateTouch() {
         unsigned long now = millis();
         
+        bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || mockTouchTriggered;
+        
         // Touch interaction debounce
-        if (digitalRead(TOUCH_PIN) == HIGH) {
+        if (isTouched) {
             if (!touchActive && (now - lastTouchTime > 1000)) {
                 touchActive = true;
                 lastTouchTime = now;
@@ -195,8 +213,66 @@ private:
                     emote.triggerConfused(); // Play confused animation when warning is active
                 }
             }
+            mockTouchTriggered = false;
         } else {
             touchActive = false;
+        }
+    }
+
+    void handleSerialCommands() {
+        if (Serial.available() > 0) {
+            String cmd = Serial.readStringUntil('\n');
+            cmd.trim();
+            
+            if (cmd.length() == 0) return;
+            
+            Serial.print(F("Received Command: "));
+            Serial.println(cmd);
+            
+            if (cmd.equalsIgnoreCase("test 1") || cmd.equalsIgnoreCase("danger_fire")) {
+                sensors.setMock(true, 45.0, 50.0, 350.0);
+                Serial.println(F("[TEST MODE] Enabled DANGER_FIRE simulation. (Temp = 45C, Humid = 50%, Lux = 350)"));
+            }
+            else if (cmd.equalsIgnoreCase("test 2") || cmd.equalsIgnoreCase("danger_humid")) {
+                sensors.setMock(true, 25.0, 90.0, 350.0);
+                Serial.println(F("[TEST MODE] Enabled DANGER_HUMID simulation. (Temp = 25C, Humid = 90%, Lux = 350)"));
+            }
+            else if (cmd.equalsIgnoreCase("test 3") || cmd.equalsIgnoreCase("warning_hot")) {
+                sensors.setMock(true, 35.0, 50.0, 350.0);
+                Serial.println(F("[TEST MODE] Enabled WARNING_HOT simulation. (Temp = 35C, Humid = 50%, Lux = 350)"));
+            }
+            else if (cmd.equalsIgnoreCase("test 4") || cmd.equalsIgnoreCase("warning_cold")) {
+                sensors.setMock(true, 15.0, 30.0, 350.0);
+                Serial.println(F("[TEST MODE] Enabled WARNING_COLD simulation. (Temp = 15C, Humid = 30%, Lux = 350)"));
+            }
+            else if (cmd.equalsIgnoreCase("test 5") || cmd.equalsIgnoreCase("sleep_mode")) {
+                sensors.setMock(true, 25.0, 55.0, 20.0);
+                Serial.println(F("[TEST MODE] Enabled SLEEP_MODE simulation. (Temp = 25C, Humid = 55%, Lux = 20)"));
+            }
+            else if (cmd.equalsIgnoreCase("test 6") || cmd.equalsIgnoreCase("warning_dark")) {
+                sensors.setMock(true, 25.0, 55.0, 100.0);
+                lastTimeLightChecked = millis() - 605000; // Bypass the 10 min threshold
+                Serial.println(F("[TEST MODE] Enabled WARNING_DARK simulation. (Temp = 25C, Humid = 55%, Lux = 100). Bypassed 10-min timer."));
+            }
+            else if (cmd.equalsIgnoreCase("test 7") || cmd.equalsIgnoreCase("touch")) {
+                mockTouchTriggered = true;
+                Serial.println(F("[TEST MODE] Triggered mock touch interaction."));
+            }
+            else if (cmd.equalsIgnoreCase("normal") || cmd.equalsIgnoreCase("exit")) {
+                sensors.setMock(false, 0, 0, 0);
+                Serial.println(F("[TEST MODE] Disabled simulation. Resuming physical sensors reading."));
+            }
+            else {
+                Serial.println(F("Unknown command! Available commands:"));
+                Serial.println(F("  - test 1 / danger_fire"));
+                Serial.println(F("  - test 2 / danger_humid"));
+                Serial.println(F("  - test 3 / warning_hot"));
+                Serial.println(F("  - test 4 / warning_cold"));
+                Serial.println(F("  - test 5 / sleep_mode"));
+                Serial.println(F("  - test 6 / warning_dark"));
+                Serial.println(F("  - test 7 / touch"));
+                Serial.println(F("  - normal / exit"));
+            }
         }
     }
 
