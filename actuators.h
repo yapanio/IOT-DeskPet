@@ -283,8 +283,12 @@ private:
         if (melody && currentNoteIndex < melodyLen) {
           if (!isSilentGap) {
             uint16_t pitch = melody[currentNoteIndex].pitch;
-            uint8_t durationType = melody[currentNoteIndex].duration;
-            unsigned long noteDuration = 240000UL / (tempo * durationType);
+            unsigned long noteDuration = 0;
+            if (currentSong == 2) {
+              noteDuration = melody[currentNoteIndex].duration; // Direct ms from Despacito.ino
+            } else {
+              noteDuration = 240000UL / (tempo * melody[currentNoteIndex].duration);
+            }
 
             if (pitch > 0) {
               playTone(pitch);
@@ -295,8 +299,12 @@ private:
             isSilentGap = true;
           } else {
             stopTone();
-            uint8_t durationType = melody[currentNoteIndex].duration;
-            unsigned long noteDuration = 240000UL / (tempo * durationType);
+            unsigned long noteDuration = 0;
+            if (currentSong == 2) {
+              noteDuration = melody[currentNoteIndex].duration; // Direct ms
+            } else {
+              noteDuration = 240000UL / (tempo * melody[currentNoteIndex].duration);
+            }
 
             nextNoteTime = now + (unsigned long)(noteDuration * 0.1);
             isSilentGap = false;
