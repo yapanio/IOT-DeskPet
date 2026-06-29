@@ -17,6 +17,7 @@ private:
   Adafruit_SSD1306 display;
   RoboEyes<Adafruit_SSD1306> eyes;
   RobotState currentState = NORMAL_HAPPY;
+  bool showParamScreen = false;
 
   // Pointer to sensors to fetch values for overlay drawing
   static Sensors *sensors;
@@ -24,6 +25,14 @@ private:
 public:
   Emote()
       : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), eyes(display) {
+  }
+
+  void setShowParamScreen(bool show) {
+    showParamScreen = show;
+  }
+
+  bool getShowParamScreen() const {
+    return showParamScreen;
   }
 
   static void drawMetricsOverlay(Adafruit_SSD1306 *disp) {
@@ -71,15 +80,15 @@ public:
     display.display();
 
     // Initialize RoboEyes
-    // Screen width for eyes is 96 (leaving 32 pixels on the right for overlay)
-    eyes.begin(96, 64, 30);
-    eyes.onDrawOverlay = &drawMetricsOverlay;
+    // Screen width for eyes is 128 (full screen, eyes centered)
+    eyes.begin(128, 64, 30);
+    eyes.onDrawOverlay = nullptr;
 
     // Set eye configuration
-    eyes.setWidth(26, 26); // Adjusted size to fit 96px width nicely
-    eyes.setHeight(30, 30);
-    eyes.setBorderradius(6, 6);
-    eyes.setSpacebetween(10);
+    eyes.setWidth(30, 30);
+    eyes.setHeight(32, 32);
+    eyes.setBorderradius(8, 8);
+    eyes.setSpacebetween(12);
     eyes.setAutoblinker(true, 3, 4);
 
     setExpression(NORMAL_HAPPY);
@@ -182,6 +191,82 @@ public:
 
   void triggerConfused() { eyes.anim_confused(); }
 
+  void drawParamScreen() {
+    display.clearDisplay();
+
+    // 1. Draw header
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(32, 2);
+    display.print(F("ENV STATUS"));
+    display.drawFastHLine(0, 12, 128, SSD1306_WHITE);
+
+    // Fetch sensor readings
+    float temp = (sensors != nullptr) ? sensors->getTemperature() : 0.0;
+    float humid = (sensors != nullptr) ? sensors->getHumidity() : 0.0;
+    float light = (sensors != nullptr) ? sensors->getLightLux() : 0.0;
+
+    // Split into 3 columns:
+    // Column 1: Temp (x: 0 to 41)
+    // Column 2: Humid (x: 43 to 84)
+    // Column 3: Light (x: 86 to 127)
+    display.drawFastVLine(42, 13, 51, SSD1306_WHITE);
+    display.drawFastVLine(85, 13, 51, SSD1306_WHITE);
+
+    // --- Column 1: Temp ---
+    display.setCursor(9, 16);
+    display.print(F("TEMP"));
+    
+    display.setCursor(4, 28);
+    display.setTextSize(2);
+    display.print((int)round(temp));
+    display.setTextSize(1);
+    display.print(F("C"));
+    
+    // Progress Bar Temp: Range 0-50 C
+    int tempBarVal = map(constrain((int)temp, 0, 50), 0, 50, 0, 30);
+    display.drawRect(5, 48, 32, 7, SSD1306_WHITE);
+    display.fillRect(6, 49, tempBarVal, 5, SSD1306_WHITE);
+
+    // --- Column 2: Humid ---
+    display.setTextSize(1);
+    display.setCursor(52, 16);
+    display.print(F("HUMI"));
+    
+    display.setCursor(47, 28);
+    display.setTextSize(2);
+    display.print((int)round(humid));
+    display.setTextSize(1);
+    display.print(F("%"));
+    
+    // Progress Bar Humid: Range 0-100 %
+    int humidBarVal = map(constrain((int)humid, 0, 100), 0, 100, 0, 30);
+    display.drawRect(48, 48, 32, 7, SSD1306_WHITE);
+    display.fillRect(49, 49, humidBarVal, 5, SSD1306_WHITE);
+
+    // --- Column 3: Light ---
+    display.setTextSize(1);
+    display.setCursor(94, 16);
+    display.print(F("LIGHT"));
+    
+    int lightVal = (int)round(light);
+    display.setCursor(90, 28);
+    display.setTextSize(2);
+    if (lightVal >= 1000) {
+      display.setTextSize(1);
+      display.setCursor(90, 32);
+    }
+    display.print(lightVal);
+    display.setTextSize(1);
+    
+    // Progress Bar Light: Range 0-1000 lx
+    int lightBarVal = map(constrain(lightVal, 0, 1000), 0, 1000, 0, 30);
+    display.drawRect(91, 48, 32, 7, SSD1306_WHITE);
+    display.fillRect(92, 49, lightBarVal, 5, SSD1306_WHITE);
+
+    display.display();
+  }
+
   void update() {
     unsigned long now = millis();
 
@@ -189,6 +274,11 @@ public:
     if (isWinking && now >= winkEndTime) {
       isWinking = false;
       setExpression(currentState); // Restore normal mood/autoblink
+    }
+
+    if (showParamScreen) {
+      drawParamScreen();
+      return;
     }
 
     if (currentState == DANGER_FIRE) {

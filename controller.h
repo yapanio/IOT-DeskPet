@@ -47,6 +47,10 @@ private:
     unsigned long danceEndTime = 0;
     RobotState preDanceState = NORMAL_HAPPY;
 
+    // Screen state
+    bool showParamScreen = false;
+    bool returnToParamScreenAfterDance = false;
+
 public:
     Controller() : 
         sensors(DHT_PIN), 
@@ -99,6 +103,12 @@ public:
                 servo.setState(currentState);
                 actuators.setState(currentState);
                 emote.setExpression(currentState);
+
+                if (returnToParamScreenAfterDance) {
+                    showParamScreen = true;
+                    emote.setShowParamScreen(true);
+                    returnToParamScreenAfterDance = false;
+                }
             }
         }
 
@@ -245,6 +255,10 @@ private:
     }
 
     void handleSingleTap() {
+        if (showParamScreen) {
+            Serial.println(F("Single Tap on parameter screen. Ignored."));
+            return;
+        }
         Serial.println(F("Handling Single Tap."));
         if (currentState == NORMAL_HAPPY) {
             actuators.triggerDoubleBeep(2000, 80, 50); // Play happy beep
@@ -255,11 +269,27 @@ private:
     }
 
     void handleDoubleTap() {
-        Serial.println(F("Handling Double Tap (Wink)."));
-        // Cheer beep
+        if (showParamScreen) {
+            Serial.println(F("Double Tap on parameter screen. Ignored."));
+            return;
+        }
+        Serial.println(F("Handling Double Tap (Wink & Shake Head)."));
         actuators.triggerDoubleBeep(2500, 60, 60);
-        // Play wink animation
         emote.triggerWink();
+        servo.triggerGentleShake();
+    }
+
+    void handleTripleTap() {
+        Serial.println(F("Handling Triple Tap (Dance Mode)."));
+        if (showParamScreen) {
+            returnToParamScreenAfterDance = true;
+            showParamScreen = false;
+            emote.setShowParamScreen(false);
+        } else {
+            returnToParamScreenAfterDance = false;
+        }
+        triggerDanceMode(1); // Play Super Mario (Song 1)
+        danceEndTime = millis() + 5000; // Limit dance to 5 seconds
     }
 
     void triggerDanceMode(int songId = 1) {
@@ -324,7 +354,13 @@ private:
             if (pressDuration >= 3000) { // Held for 3 seconds
                 longPressDetected = true;
                 tapCount = 0; // Clear pending taps
-                triggerDanceMode(1); // Play Super Mario (Song 1)
+                
+                showParamScreen = !showParamScreen;
+                emote.setShowParamScreen(showParamScreen);
+                Serial.print(F("Toggling Parameter Screen Mode. Active: "));
+                Serial.println(showParamScreen);
+                
+                actuators.triggerSingleBeep(1500, 100); // Beep to indicate screen change
             }
         }
 
@@ -332,8 +368,10 @@ private:
         if (tapCount > 0 && (now - lastTapTime > 400)) {
             if (tapCount == 1) {
                 handleSingleTap();
-            } else if (tapCount >= 2) {
+            } else if (tapCount == 2) {
                 handleDoubleTap();
+            } else if (tapCount >= 3) {
+                handleTripleTap();
             }
             tapCount = 0; // Reset
         }

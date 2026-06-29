@@ -34,7 +34,7 @@ private:
   bool alarmToggleState = false;
 
   // Volume duty cycle: 5 out of 255 (approx 2% duty cycle)
-  const int buzzerVolume = 5; 
+  const int buzzerVolume = 0; 
 
   // Cross-compatible tone generator using LEDC
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
