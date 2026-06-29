@@ -87,12 +87,14 @@ public:
         // 1. Update sensor data (non-blocking)
         sensors.update();
 
-        // Check if Dance Mode timer has ended
+        // Check if Dance Mode timer has ended or song completed
         if (isDancing) {
             unsigned long now = millis();
-            if (now >= danceEndTime) {
+            bool songFinished = !actuators.isSongPlaying();
+            if (now >= danceEndTime || songFinished) {
                 Serial.println(F("[Dance Mode] Dance completed. Returning to normal."));
                 isDancing = false;
+                actuators.stopSong();
                 currentState = preDanceState;
                 servo.setState(currentState);
                 actuators.setState(currentState);
@@ -150,10 +152,10 @@ private:
         else if (humid > 85.0) {
             nextState = DANGER_HUMID;
         } 
-        else if (temp > 30.0 || feel > 33.0) {
+        else if (temp > 33.0 || feel > 35.0) {
             nextState = WARNING_HOT;
         } 
-        else if (temp < 18.0 && humid < 35.0) {
+        else if (temp < 18.0 && humid < 36.0) {
             nextState = WARNING_COLD;
         } 
         else if (lux < 50.0) {
@@ -194,16 +196,29 @@ private:
             // Set up buzzer timer so it triggers beeps immediately on warning entry
             if (currentState == WARNING_HOT) {
                 lastTimeBuzzerSounded = now - 300000;
+                // Auto play Despacito (Song 2) once on hot warning
+                actuators.playSong(2);
+            } else if (currentState == WARNING_COLD) {
+                lastTimeBuzzerSounded = now;
+                // Auto play Jingle Bells (Song 3) once on cold warning
+                actuators.playSong(3);
             } else if (currentState == WARNING_DARK) {
                 lastTimeBuzzerSounded = now - 60000;
+                actuators.stopSong();
             } else {
                 lastTimeBuzzerSounded = now;
+                actuators.stopSong();
             }
         }
     }
 
     void updateBuzzerReminders() {
         unsigned long now = millis();
+        
+        // If a song is currently playing, do not play warning beeps
+        if (actuators.isSongPlaying()) {
+            return;
+        }
         
         if (currentState == WARNING_HOT) {
             // Beep every 5 minutes (300,000 ms)
@@ -239,10 +254,11 @@ private:
         emote.triggerWink();
     }
 
-    void triggerDanceMode() {
-        Serial.println(F("Handling Long Press: Triggering DANCE MODE!"));
+    void triggerDanceMode(int songId = 1) {
+        Serial.print(F("Triggering DANCE MODE with Song ID: "));
+        Serial.println(songId);
         isDancing = true;
-        danceEndTime = millis() + 5000; // Dance for 5 seconds
+        danceEndTime = millis() + 60000; // Max dance for 60 seconds (or until song finishes)
         preDanceState = currentState;   // Save previous state to restore later
         currentState = DANCE_MODE;
         
@@ -250,6 +266,29 @@ private:
         servo.setState(currentState);
         actuators.setState(currentState);
         emote.setExpression(currentState);
+        
+        // Start song playback
+        actuators.playSong(songId);
+    }
+
+    void stopDanceMode() {
+        if (isDancing) {
+            Serial.println(F("[Dance Mode] Stopped."));
+            isDancing = false;
+            actuators.stopSong();
+            currentState = preDanceState;
+            servo.setState(currentState);
+            actuators.setState(currentState);
+            emote.setExpression(currentState);
+        }
+    }
+
+    void playSongBlynk(int songId) {
+        if (songId >= 1 && songId <= 3) {
+            triggerDanceMode(songId);
+        } else {
+            stopDanceMode();
+        }
     }
 
     void updateTouch() {
@@ -285,7 +324,7 @@ private:
             if (pressDuration >= 3000) { // Held for 3 seconds
                 longPressDetected = true;
                 tapCount = 0; // Clear pending taps
-                triggerDanceMode();
+                triggerDanceMode(1); // Play Super Mario (Song 1)
             }
         }
 

@@ -2,6 +2,7 @@
 #define ACTUATORS_H
 
 #include "robot_state.h"
+#include "songs.h"
 #include <Adafruit_NeoPixel.h>
 #include <esp_arduino_version.h>
 
@@ -14,6 +15,12 @@ private:
   RobotState currentState = NORMAL_HAPPY;
 
   unsigned long lastLedUpdate = 0;
+
+  // Non-blocking song playing variables
+  int currentSong = 0; // 0: Idle, 1: Mario, 2: Despacito, 3: Jingle Bells
+  int currentNoteIndex = 0;
+  unsigned long nextNoteTime = 0;
+  bool isSilentGap = false;
 
   // Buzzer state machine for one-shot sequences
   unsigned long buzzerSeqStart = 0;
@@ -78,10 +85,32 @@ public:
 
       // Turn off buzzer immediately and clear pending beep sequences
       stopTone();
+      stopSong();
       buzzerSeqStep = 0;
       lastAlarmToggle = 0;
       alarmToggleState = false;
     }
+  }
+
+  void playSong(int songId) {
+    if (songId >= 1 && songId <= 3) {
+      currentSong = songId;
+      currentNoteIndex = 0;
+      nextNoteTime = millis();
+      isSilentGap = false;
+      stopTone();
+    } else {
+      stopSong();
+    }
+  }
+
+  void stopSong() {
+    currentSong = 0;
+    stopTone();
+  }
+
+  bool isSongPlaying() const {
+    return currentSong != 0;
   }
 
   // Trigger a single beep
@@ -211,53 +240,100 @@ private:
   void updateBuzzer() {
     unsigned long now = millis();
 
+    // Danger states have absolute priority and will override any song
     if (currentState == DANGER_FIRE) {
+      if (currentSong != 0) stopSong();
       // Rapid alarm siren: alternating frequency every 120ms
       if (now - lastAlarmToggle >= 120) {
         lastAlarmToggle = now;
         alarmToggleState = !alarmToggleState;
         playTone(alarmToggleState ? 2500 : 1800);
       }
-    } else if (currentState == DANGER_HUMID) {
+      return;
+    } 
+    
+    if (currentState == DANGER_HUMID) {
+      if (currentSong != 0) stopSong();
       // Continuous warning tone at 1000Hz
       playTone(1000);
-    } else if (currentState == DANCE_MODE) {
-      // Play a cheerful, rhythmic melody (8 notes, 250ms per note)
-      int noteIndex = (now / 250) % 8;
-      int notes[] = {523, 659, 784, 1047, 784, 659, 523, 784}; // C5, E5, G5, C6, G5, E5, C5, G5
-      int msWithinNote = now % 250;
-      if (msWithinNote < 180) { // Play note for 180ms, then 70ms silence (staccato effect)
-        playTone(notes[noteIndex]);
+      return;
+    }
+
+    // If a song is playing, handle non-blocking playback
+    if (currentSong != 0) {
+      if (now >= nextNoteTime) {
+        const Note* melody = nullptr;
+        int melodyLen = 0;
+        int tempo = 120;
+
+        if (currentSong == 1) {
+          melody = mario_melody;
+          melodyLen = mario_length;
+          tempo = mario_tempo;
+        } else if (currentSong == 2) {
+          melody = despacito_melody;
+          melodyLen = despacito_length;
+          tempo = despacito_tempo;
+        } else if (currentSong == 3) {
+          melody = jingle_bells_melody;
+          melodyLen = jingle_bells_length;
+          tempo = jingle_bells_tempo;
+        }
+
+        if (melody && currentNoteIndex < melodyLen) {
+          if (!isSilentGap) {
+            uint16_t pitch = melody[currentNoteIndex].pitch;
+            uint8_t durationType = melody[currentNoteIndex].duration;
+            unsigned long noteDuration = 240000UL / (tempo * durationType);
+
+            if (pitch > 0) {
+              playTone(pitch);
+            } else {
+              stopTone();
+            }
+            nextNoteTime = now + (unsigned long)(noteDuration * 0.9);
+            isSilentGap = true;
+          } else {
+            stopTone();
+            uint8_t durationType = melody[currentNoteIndex].duration;
+            unsigned long noteDuration = 240000UL / (tempo * durationType);
+
+            nextNoteTime = now + (unsigned long)(noteDuration * 0.1);
+            isSilentGap = false;
+            currentNoteIndex++;
+          }
+        } else {
+          stopSong();
+        }
+      }
+      return;
+    }
+
+    // Normal buzzer one-shot sequences if no song is playing
+    if (buzzerSeqStep == 1) {
+      if (now - buzzerSeqStart < (unsigned long)buzzerDur) {
+        playTone(buzzerFreq);
       } else {
         stopTone();
-      }
-    } else {
-      // Sequence beep states (non-blocking)
-      if (buzzerSeqStep == 1) {
-        if (now - buzzerSeqStart < (unsigned long)buzzerDur) {
-          playTone(buzzerFreq);
+        if (buzzerGap > 0) {
+          buzzerSeqStep = 2;
         } else {
-          stopTone();
-          if (buzzerGap > 0) {
-            buzzerSeqStep = 2;
-          } else {
-            buzzerSeqStep = 0;
-          }
-          buzzerSeqStart = now;
-        }
-      } else if (buzzerSeqStep == 2) {
-        stopTone();
-        if (now - buzzerSeqStart >= (unsigned long)buzzerGap) {
-          buzzerSeqStep = 3;
-          buzzerSeqStart = now;
-        }
-      } else if (buzzerSeqStep == 3) {
-        if (now - buzzerSeqStart < (unsigned long)buzzerDur) {
-          playTone(buzzerFreq);
-        } else {
-          stopTone();
           buzzerSeqStep = 0;
         }
+        buzzerSeqStart = now;
+      }
+    } else if (buzzerSeqStep == 2) {
+      stopTone();
+      if (now - buzzerSeqStart >= (unsigned long)buzzerGap) {
+        buzzerSeqStep = 3;
+        buzzerSeqStart = now;
+      }
+    } else if (buzzerSeqStep == 3) {
+      if (now - buzzerSeqStart < (unsigned long)buzzerDur) {
+        playTone(buzzerFreq);
+      } else {
+        stopTone();
+        buzzerSeqStep = 0;
       }
     }
   }
