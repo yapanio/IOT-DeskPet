@@ -11,8 +11,8 @@
 #include <BlynkSimpleEsp32.h>
 
 // WiFi Configuration - Thay đổi thông tin Wifi của bạn ở đây
-#define WIFI_SSID "B504L"
-#define WIFI_PASS "khongchomk"
+#define WIFI_SSID "luwukien"
+#define WIFI_PASS "aloalo1234"
 
 class BlynkService {
 private:

@@ -130,6 +130,14 @@ public:
         );
     }
 
+    void playSongBlynk(int songId) {
+        if (songId >= 1 && songId <= 3) {
+            triggerDanceMode(songId);
+        } else {
+            stopDanceMode();
+        }
+    }
+
 private:
     void evaluateState() {
         float temp = sensors.getTemperature();
@@ -280,14 +288,6 @@ private:
             servo.setState(currentState);
             actuators.setState(currentState);
             emote.setExpression(currentState);
-        }
-    }
-
-    void playSongBlynk(int songId) {
-        if (songId >= 1 && songId <= 3) {
-            triggerDanceMode(songId);
-        } else {
-            stopDanceMode();
         }
     }
 
