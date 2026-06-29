@@ -61,6 +61,9 @@ public:
         targetAngle = 90.0;
         lastNormalHappyMove = millis();
         break;
+      case DANCE_MODE:
+        targetAngle = 60.0; // Start sweeping quickly between 60 and 120
+        break;
       }
     }
   }
@@ -123,6 +126,14 @@ public:
         lastNormalHappyMove = now;
         int angles[] = {60, 75, 90, 105, 120};
         targetAngle = angles[random(0, 5)];
+      }
+      break;
+
+    case DANCE_MODE:
+      interval = 12; // Fast updates
+      step = 5.0;    // Rapid movements
+      if (abs(currentAngle - targetAngle) < 1.0) {
+        targetAngle = (targetAngle == 60.0) ? 120.0 : 60.0;
       }
       break;
     }

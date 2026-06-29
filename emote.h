@@ -154,7 +154,28 @@ public:
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(true, 3, 3); // Look around randomly
       break;
+
+    case DANCE_MODE:
+      eyes.open();
+      eyes.setMood(RE_HAPPY);
+      eyes.setSweat(false);
+      eyes.setHFlicker(false);
+      eyes.setAutoblinker(false); // No autoblinker while dancing
+      eyes.setIdleMode(false);
+      eyes.setPosition(RE_DEFAULT);
+      break;
     }
+  }
+
+  // Winking state variables
+  bool isWinking = false;
+  unsigned long winkEndTime = 0;
+
+  void triggerWink() {
+    isWinking = true;
+    winkEndTime = millis() + 1000; // Wink for 1 second
+    eyes.setAutoblinker(false);
+    eyes.close(true, false); // Close left eye, open right eye
   }
 
   void triggerLaugh() { eyes.anim_laugh(); }
@@ -162,6 +183,14 @@ public:
   void triggerConfused() { eyes.anim_confused(); }
 
   void update() {
+    unsigned long now = millis();
+
+    // Reset winking state when time is up
+    if (isWinking && now >= winkEndTime) {
+      isWinking = false;
+      setExpression(currentState); // Restore normal mood/autoblink
+    }
+
     if (currentState == DANGER_FIRE) {
       // Direct drawing for X _ X face (bypassing RoboEyes)
       display.clearDisplay();
@@ -182,6 +211,12 @@ public:
 
       display.display();
     } else {
+      if (currentState == DANCE_MODE && !isWinking) {
+        // Roll eyes in a circle during Dance Mode
+        int directionIndex = (now / 200) % 8;
+        int directions[] = {RE_N, RE_NE, RE_E, RE_SE, RE_S, RE_SW, RE_W, RE_NW};
+        eyes.setPosition(directions[directionIndex]);
+      }
       // Update standard RoboEyes animations
       eyes.update();
     }

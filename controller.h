@@ -35,6 +35,18 @@ private:
     unsigned long lastTouchTime = 0;
     bool mockTouchTriggered = false;
 
+    // Touch state machine variables
+    bool lastTouchState = false;
+    unsigned long touchStartTime = 0;
+    unsigned long lastTapTime = 0;
+    int tapCount = 0;
+    bool longPressDetected = false;
+
+    // Dance Mode control variables
+    bool isDancing = false;
+    unsigned long danceEndTime = 0;
+    RobotState preDanceState = NORMAL_HAPPY;
+
 public:
     Controller() : 
         sensors(DHT_PIN), 
@@ -75,11 +87,28 @@ public:
         // 1. Update sensor data (non-blocking)
         sensors.update();
 
-        // 2. Evaluate state transitions
-        evaluateState();
+        // Check if Dance Mode timer has ended
+        if (isDancing) {
+            unsigned long now = millis();
+            if (now >= danceEndTime) {
+                Serial.println(F("[Dance Mode] Dance completed. Returning to normal."));
+                isDancing = false;
+                currentState = preDanceState;
+                servo.setState(currentState);
+                actuators.setState(currentState);
+                emote.setExpression(currentState);
+            }
+        }
 
-        // 3. Update non-blocking warning buzzer intervals
-        updateBuzzerReminders();
+        // 2. Evaluate state transitions (only if not dancing)
+        if (!isDancing) {
+            evaluateState();
+        }
+
+        // 3. Update non-blocking warning buzzer intervals (only if not dancing)
+        if (!isDancing) {
+            updateBuzzerReminders();
+        }
 
         // 4. Read interactive touch input
         updateTouch();
@@ -192,31 +221,85 @@ private:
         }
     }
 
-    void updateTouch() {
-        unsigned long now = millis();
-        
-        bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || mockTouchTriggered;
-        
-        // Touch interaction debounce
-        if (isTouched) {
-            if (!touchActive && (now - lastTouchTime > 1000)) {
-                touchActive = true;
-                lastTouchTime = now;
-                
-                Serial.println(F("Touch sensor triggered!"));
-                
-                // Only react if we are in normal state (not alarms or warnings)
-                if (currentState == NORMAL_HAPPY) {
-                    actuators.triggerDoubleBeep(2000, 80, 50); // Play happy beep
-                    emote.triggerLaugh(); // Trigger RoboEyes laugh animation
-                } else {
-                    emote.triggerConfused(); // Play confused animation when warning is active
-                }
-            }
-            mockTouchTriggered = false;
+    void handleSingleTap() {
+        Serial.println(F("Handling Single Tap."));
+        if (currentState == NORMAL_HAPPY) {
+            actuators.triggerDoubleBeep(2000, 80, 50); // Play happy beep
+            emote.triggerLaugh(); // Trigger RoboEyes laugh animation
         } else {
-            touchActive = false;
+            emote.triggerConfused(); // Play confused animation when warning/danger is active
         }
+    }
+
+    void handleDoubleTap() {
+        Serial.println(F("Handling Double Tap (Wink)."));
+        // Cheer beep
+        actuators.triggerDoubleBeep(2500, 60, 60);
+        // Play wink animation
+        emote.triggerWink();
+    }
+
+    void triggerDanceMode() {
+        Serial.println(F("Handling Long Press: Triggering DANCE MODE!"));
+        isDancing = true;
+        danceEndTime = millis() + 5000; // Dance for 5 seconds
+        preDanceState = currentState;   // Save previous state to restore later
+        currentState = DANCE_MODE;
+        
+        // Dispatch state change to sub-systems
+        servo.setState(currentState);
+        actuators.setState(currentState);
+        emote.setExpression(currentState);
+    }
+
+    void updateTouch() {
+        if (isDancing) {
+            mockTouchTriggered = false;
+            return;
+        }
+
+        unsigned long now = millis();
+        bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || mockTouchTriggered;
+
+        // Detect touch press (rising edge)
+        if (isTouched && !lastTouchState) {
+            touchStartTime = now;
+            longPressDetected = false;
+        }
+
+        // Detect touch release (falling edge)
+        if (!isTouched && lastTouchState) {
+            unsigned long pressDuration = now - touchStartTime;
+
+            // Only count as tap if it wasn't already triggered as a long press
+            if (!longPressDetected && pressDuration > 50 && pressDuration < 600) {
+                tapCount++;
+                lastTapTime = now;
+            }
+            mockTouchTriggered = false; // Reset mock trigger
+        }
+
+        // Detect long press while holding (does not wait for release)
+        if (isTouched && !longPressDetected) {
+            unsigned long pressDuration = now - touchStartTime;
+            if (pressDuration >= 3000) { // Held for 3 seconds
+                longPressDetected = true;
+                tapCount = 0; // Clear pending taps
+                triggerDanceMode();
+            }
+        }
+
+        // Evaluate tap count after a short timeout (400ms after last tap)
+        if (tapCount > 0 && (now - lastTapTime > 400)) {
+            if (tapCount == 1) {
+                handleSingleTap();
+            } else if (tapCount >= 2) {
+                handleDoubleTap();
+            }
+            tapCount = 0; // Reset
+        }
+
+        lastTouchState = isTouched;
     }
 
     void handleSerialCommands() {
@@ -258,6 +341,12 @@ private:
                 mockTouchTriggered = true;
                 Serial.println(F("[TEST MODE] Triggered mock touch interaction."));
             }
+            else if (cmd.equalsIgnoreCase("test 8") || cmd.equalsIgnoreCase("double_tap")) {
+                handleDoubleTap();
+            }
+            else if (cmd.equalsIgnoreCase("test 9") || cmd.equalsIgnoreCase("long_press") || cmd.equalsIgnoreCase("dance")) {
+                triggerDanceMode();
+            }
             else if (cmd.equalsIgnoreCase("normal") || cmd.equalsIgnoreCase("exit")) {
                 sensors.setMock(false, 0, 0, 0);
                 Serial.println(F("[TEST MODE] Disabled simulation. Resuming physical sensors reading."));
@@ -271,6 +360,8 @@ private:
                 Serial.println(F("  - test 5 / sleep_mode"));
                 Serial.println(F("  - test 6 / warning_dark"));
                 Serial.println(F("  - test 7 / touch"));
+                Serial.println(F("  - test 8 / double_tap"));
+                Serial.println(F("  - test 9 / long_press / dance"));
                 Serial.println(F("  - normal / exit"));
             }
         }
@@ -285,6 +376,7 @@ private:
             case WARNING_DARK: return "WARNING_DARK";
             case SLEEP_MODE:   return "SLEEP_MODE";
             case NORMAL_HAPPY: return "NORMAL_HAPPY";
+            case DANCE_MODE:   return "DANCE_MODE";
             default:           return "UNKNOWN";
         }
     }

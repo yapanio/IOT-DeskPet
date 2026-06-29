@@ -8,7 +8,8 @@ enum RobotState {
     WARNING_COLD,
     WARNING_DARK,
     SLEEP_MODE,
-    NORMAL_HAPPY
+    NORMAL_HAPPY,
+    DANCE_MODE
 };
 
 #endif
