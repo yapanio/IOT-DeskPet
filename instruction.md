@@ -53,7 +53,7 @@ Tài liệu này định nghĩa cấu hình chân linh kiện, các nhóm trạn
 ### 2. Nhóm Cảnh Báo Môi Trường (Tích hợp âm nhạc cảnh báo)
 
 #### Trường hợp 2.1: Quá nóng hoặc Ngột ngạt (Hiệu ứng nhà kính)
-- **Điều kiện:** Nhiệt độ thực tế $T > 30^\circ\text{C}$ **OR** Nhiệt độ cảm nhận $T_{\text{feel}} > 33^\circ\text{C}$.
+- **Điều kiện:** Nhiệt độ thực tế $T > 33^\circ\text{C}$ **OR** Nhiệt độ cảm nhận $T_{\text{feel}} > 35^\circ\text{C}$.
 - **Robot phản ứng:**
   - **Màn hình:** Mắt mệt mỏi, rủ xuống `(~ _ ~)`.
   - **Đèn LED:** Chuyển sang màu Cam.
@@ -61,7 +61,7 @@ Tài liệu này định nghĩa cấu hình chân linh kiện, các nhóm trạn
   - **Còi:** Ngay khi chuyển sang trạng thái này, robot sẽ tự động phát nhạc bài **Despacito** một lần (không chặn). Sau khi nhạc kết thúc, nếu tiếp tục ở trạng thái nóng, còi kêu 1 tiếng "bíp" ngắn nhắc nhở sau mỗi 5 phút.
 
 #### Trường hợp 2.2: Lạnh và Khô (Phòng điều hòa quá đà)
-- **Điều kiện:** Nhiệt độ $T < 18^\circ\text{C}$ **AND** Độ ẩm $H < 35\%$.
+- **Điều kiện:** Nhiệt độ $T < 18^\circ\text{C}$ **AND** Độ ẩm $H < 36\%$.
 - **Robot phản ứng:**
   - **Màn hình:** Mắt run rẩy (`HFlicker` kích hoạt).
   - **Đèn LED:** Màu Xanh lam nhạt (70% độ sáng).

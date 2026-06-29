@@ -55,9 +55,9 @@ graph TD
     B -- Đúng --> C[DANGER_FIRE]
     B -- Sai --> D{Độ ẩm > 85%?}
     D -- Đúng --> E[DANGER_HUMID]
-    D -- Sai --> F{Nhiệt độ > 30°C hoặc chỉ số cảm nhận nhiệt > 33°C?}
+    D -- Sai --> F{Nhiệt độ > 33°C hoặc chỉ số cảm nhận nhiệt > 35°C?}
     F -- Đúng --> G[WARNING_HOT]
-    F -- Sai --> H{Nhiệt độ < 18°C và Độ ẩm < 35%?}
+    F -- Sai --> H{Nhiệt độ < 18°C và Độ ẩm < 36%?}
     H -- Đúng --> I[WARNING_COLD]
     H -- Sai --> J{Ánh sáng < 50 lux?}
     J -- Đúng --> K[SLEEP_MODE]
@@ -80,8 +80,8 @@ Khớp đầu Servo của robot được cấu hình ở góc gốc là **90° (
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`DANGER_FIRE`** <br>*(Nguy cơ hỏa hoạn)* | $T > 42^\circ\text{C}$ | Hiển thị biểu tượng hoảng loạn `X _ X` (Vẽ trực tiếp bằng đường thẳng). | Chớp tắt màu ĐỎ liên tục với tần số cao (mỗi 100ms). | Quay nhanh qua lại liên tục giữa 2 cực hạn `60°` và `120°` (`step = 6.0`, `interval = 10ms`). | Còi hú báo động liên tục, thay đổi tần số (2500Hz và 1800Hz) mỗi 120ms. **Ngắt toàn bộ nhạc nền**. |
 | **`DANGER_HUMID`** <br>*(Độ ẩm nguy hại)* | $H > 85\%$ | Mắt rủ mệt mỏi (`TIRED`), đổ mồ hôi (`Sweat` hoạt động). | Màu ĐỎ sáng tĩnh ở độ sáng tối đa 100%. | Quay hẳn sang góc cực hạn `60°` (tránh hướng có hơi ẩm của máy phun sương) và đứng yên. | Kêu còi cảnh báo kéo dài liên tục ở tần số cố định 1000Hz. **Ngắt toàn bộ nhạc nền**. |
-| **`WARNING_HOT`** <br>*(Môi trường nóng)* | $T > 30^\circ\text{C}$ hoặc $T_{\text{feel}} > 33^\circ\text{C}$ | Mắt mệt mỏi (`TIRED`). | Màu CAM sáng tĩnh ở độ sáng trung bình 70%. | Xoay chậm chạp qua lại giữa `60°` và `120°` (`step = 1.0`, `interval = 50ms`). | **Tự động phát bài hát Despacito 1 lần**. Sau đó, nếu tiếp tục nóng sẽ kêu 1 tiếng bíp ngắn (1200Hz, 150ms) sau mỗi 5 phút. |
-| **`WARNING_COLD`** <br>*(Môi trường lạnh khô)*| $T < 18^\circ\text{C}$ và $H < 35\%$ | Mắt mệt mỏi, chế độ rung mắt run rẩy (`HFlicker`). | Màu XANH LƠ sáng tĩnh (70% độ sáng). | Rung lắc nhẹ giả vờ run rẩy (dao động nhanh giữa `85°` và `95°`, `step = 10.0`, `interval = 30ms`). | **Tự động phát bài hát Jingle Bells 1 lần**. |
+| **`WARNING_HOT`** <br>*(Môi trường nóng)* | $T > 33^\circ\text{C}$ hoặc $T_{\text{feel}} > 35^\circ\text{C}$ | Mắt mệt mỏi (`TIRED`). | Màu CAM sáng tĩnh ở độ sáng trung bình 70%. | Xoay chậm chạp qua lại giữa `60°` và `120°` (`step = 1.0`, `interval = 50ms`). | **Tự động phát bài hát Despacito 1 lần**. Sau đó, nếu tiếp tục nóng sẽ kêu 1 tiếng bíp ngắn (1200Hz, 150ms) sau mỗi 5 phút. |
+| **`WARNING_COLD`** <br>*(Môi trường lạnh khô)*| $T < 18^\circ\text{C}$ và $H < 36\%$ | Mắt mệt mỏi, chế độ rung mắt run rẩy (`HFlicker`). | Màu XANH LƠ sáng tĩnh (70% độ sáng). | Rung lắc nhẹ giả vờ run rẩy (dao động nhanh giữa `85°` và `95°`, `step = 10.0`, `interval = 30ms`). | **Tự động phát bài hát Jingle Bells 1 lần**. |
 | **`WARNING_DARK`** <br>*(Cảnh báo thiếu sáng)*| $50 \le \text{Lux} < 150$ kéo dài quá 10 phút. | Mắt nheo lại giận dữ (`ANGRY`) và hướng nhìn lên phía trên. | Chớp tắt màu VÀNG chậm (mỗi 500ms). | Quay về vị trí chính giữa `90°`. | Tắt nhạc tự động. Chỉ phát tiếng bíp đôi (1500Hz, độ dài 80ms, khoảng cách 80ms) sau mỗi 1 phút. |
 | **`SLEEP_MODE`** <br>*(Chế độ ngủ đêm)* | $\text{Lux} < 50$ | Mắt nhắm hẳn lại ngủ ngon. | Màu TÍM mờ (10% độ sáng) đóng vai trò làm đèn ngủ ban đêm. | Quay về chính giữa `90°` và đứng yên hoàn toàn. | Tắt nhạc. |
 | **`NORMAL_HAPPY`** <br>*(Bình thường vui vẻ)*| Tất cả các chỉ số đều ở ngưỡng an toàn. | Mắt cười (`HAPPY`), thỉnh thoảng chớp mắt tự động. | Hiệu ứng "nhịp thở" (breathing) màu XANH LÁ CÂY (chu kỳ 3000ms). | Thỉnh thoảng nhìn ngó xung quanh: ngẫu nhiên quay về góc `{60, 75, 90, 105, 120}` mỗi 3 phút. | Tắt nhạc nền. |
