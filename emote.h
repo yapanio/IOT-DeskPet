@@ -20,7 +20,7 @@ private:
   bool showParamScreen = false;
 
   // Pointer to sensors to fetch values for overlay drawing
-  static Sensors *sensors;
+  Sensors *sensors = nullptr;
 
 public:
   Emote()
@@ -35,7 +35,7 @@ public:
     return showParamScreen;
   }
 
-  static void drawMetricsOverlay(Adafruit_SSD1306 *disp) {
+  void drawMetricsOverlay(Adafruit_SSD1306 *disp) {
     if (sensors == nullptr)
       return;
 
@@ -82,7 +82,6 @@ public:
     // Initialize RoboEyes
     // Screen width for eyes is 128 (full screen, eyes centered)
     eyes.begin(128, 64, 30);
-    eyes.onDrawOverlay = nullptr;
 
     // Set eye configuration
     eyes.setWidth(30, 30);
@@ -312,8 +311,5 @@ public:
     }
   }
 };
-
-// Define static member
-Sensors *Emote::sensors = nullptr;
 
 #endif

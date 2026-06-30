@@ -77,7 +77,6 @@ public:
   bool cyclops = 0;   // if true, draw only one eye
   bool eyeL_open = 0; // left eye opened or closed?
   bool eyeR_open = 0; // right eye opened or closed?
-  void (*onDrawOverlay)(AdafruitDisplay *display) = nullptr;
 
   //*********************************************************************************************
   //  Eyes Geometry
@@ -826,9 +825,6 @@ public:
                              sweatBorderradius, MAINCOLOR); // draw sweat drop
     }
 
-    if (onDrawOverlay != nullptr) {
-      onDrawOverlay(display);
-    }
     display->display(); // show drawings on display
 
   } // end of drawEyes method
