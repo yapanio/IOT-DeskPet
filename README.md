@@ -106,3 +106,14 @@ Mở file [blynk_service.h](file:///d:/Materials/4_Semester/IOT102/Project/Proje
 ```
 
 Sau đó biên dịch dự án và nạp code xuống board ESP32 của bạn!
+
+---
+
+## 👥 Thành Viên Dự Án (Project Contributors)
+
+| Họ và Tên | Mã Sinh Viên (MSSV) | Vai Trò |
+| :--- | :--- | :--- |
+| **Nguyễn Huy Nhật** | HE204465 | Thành viên nhóm |
+| **Lưu Chí Kiên** | HE204365 | Thành viên nhóm |
+| **Phạm Công Hùng** | HEXXXXXX | Thành viên nhóm |
+
