@@ -8,6 +8,12 @@ BLYNK_WRITE(V5) {
   robotController.playSongBlynk(songId);
 }
 
+// Blynk callback to simulate touch via Virtual Pin V6
+BLYNK_WRITE(V6) {
+  int pressed = param.asInt();
+  robotController.setBlynkTouch(pressed == 1);
+}
+
 void setup() {
   robotController.begin();
 }

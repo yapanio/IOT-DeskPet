@@ -16,6 +16,8 @@ private:
 
   unsigned long lastLedUpdate = 0;
 
+  bool muted = false;
+
   // Non-blocking song playing variables
   int currentSong = 0; // 0: Idle, 1: Mario, 2: Despacito, 3: Jingle Bells
   int currentNoteIndex = 0;
@@ -34,7 +36,7 @@ private:
   bool alarmToggleState = false;
 
   // Volume duty cycle: 5 out of 255 (approx 2% duty cycle)
-  const int buzzerVolume = 0; 
+  const int buzzerVolume = 5; 
 
   // Cross-compatible tone generator using LEDC
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
@@ -79,6 +81,16 @@ public:
     stopTone();
   }
 
+  void setMuted(bool mute) {
+    muted = mute;
+    if (muted) {
+      stopTone();
+      stopSong();
+    }
+  }
+
+  bool isMuted() const { return muted; }
+
   void setState(RobotState state) {
     if (currentState != state) {
       currentState = state;
@@ -89,6 +101,7 @@ public:
       buzzerSeqStep = 0;
       lastAlarmToggle = 0;
       alarmToggleState = false;
+      muted = false;
     }
   }
 
@@ -242,6 +255,10 @@ private:
 
     // Danger states have absolute priority and will override any song
     if (currentState == DANGER_FIRE) {
+      if (muted) {
+        stopTone();
+        return;
+      }
       if (currentSong != 0) stopSong();
       // Rapid alarm siren: alternating frequency every 120ms
       if (now - lastAlarmToggle >= 120) {
@@ -253,6 +270,10 @@ private:
     } 
     
     if (currentState == DANGER_HUMID) {
+      if (muted) {
+        stopTone();
+        return;
+      }
       if (currentSong != 0) stopSong();
       // Continuous warning tone at 1000Hz
       playTone(1000);
@@ -261,6 +282,10 @@ private:
 
     // If a song is playing, handle non-blocking playback
     if (currentSong != 0) {
+      if (muted) {
+        stopSong();
+        return;
+      }
       if (now >= nextNoteTime) {
         const Note* melody = nullptr;
         int melodyLen = 0;
