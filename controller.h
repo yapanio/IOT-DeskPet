@@ -170,7 +170,7 @@ private:
         else if (humid > 85.0) {
             nextState = DANGER_HUMID;
         } 
-        else if (temp > 33.0 || feel > 35.0) {
+        else if (temp > 35.0 || feel > 38.0) {
             nextState = WARNING_HOT;
         } 
         else if (temp < 18.0 && humid < 36.0) {
