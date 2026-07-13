@@ -26,6 +26,10 @@ private:
 
     RobotState currentState = NORMAL_HAPPY;
     
+    // Mode flags
+    bool testModeActive = false;
+    bool alarmMuted = false;
+    
     // Timers
     unsigned long lastTimeLightChecked = 0;
     unsigned long lastTimeBuzzerSounded = 0;
@@ -34,6 +38,7 @@ private:
     bool touchActive = false;
     unsigned long lastTouchTime = 0;
     bool mockTouchTriggered = false;
+    bool blynkTouchState = false;
 
     // Touch state machine variables
     bool lastTouchState = false;
@@ -148,6 +153,12 @@ public:
         }
     }
 
+    void setBlynkTouch(bool pressed) {
+        blynkTouchState = pressed;
+        Serial.print(F("[Blynk] Virtual touch state: "));
+        Serial.println(blynkTouchState ? F("PRESSED") : F("RELEASED"));
+    }
+
 private:
     void evaluateState() {
         float temp = sensors.getTemperature();
@@ -206,6 +217,9 @@ private:
 
             currentState = nextState;
             
+            // Reset alarm muted on state transition
+            alarmMuted = false;
+            
             // Dispatch state change to sub-systems
             servo.setState(currentState);
             actuators.setState(currentState);
@@ -231,6 +245,10 @@ private:
     }
 
     void updateBuzzerReminders() {
+        if (alarmMuted) {
+            return;
+        }
+
         unsigned long now = millis();
         
         // If a song is currently playing, do not play warning beeps
@@ -255,16 +273,72 @@ private:
     }
 
     void handleSingleTap() {
-        if (showParamScreen) {
-            Serial.println(F("Single Tap on parameter screen. Ignored."));
+        if (testModeActive) {
+            Serial.println(F("[Test Mode] Single tap detected. Cycling state."));
+            // Cycle test states by checking currentState and setting mock sensor values
+            switch (currentState) {
+                case NORMAL_HAPPY:
+                    // -> DANGER_FIRE
+                    sensors.setMock(true, 45.0, 50.0, 350.0);
+                    Serial.println(F("[Test Mode] Mocking DANGER_FIRE. (Temp = 45C, Humid = 50%, Lux = 350)"));
+                    break;
+                case DANGER_FIRE:
+                    // -> DANGER_HUMID
+                    sensors.setMock(true, 25.0, 90.0, 350.0);
+                    Serial.println(F("[Test Mode] Mocking DANGER_HUMID. (Temp = 25C, Humid = 90%, Lux = 350)"));
+                    break;
+                case DANGER_HUMID:
+                    // -> WARNING_HOT
+                    sensors.setMock(true, 35.0, 50.0, 350.0);
+                    Serial.println(F("[Test Mode] Mocking WARNING_HOT. (Temp = 35C, Humid = 50%, Lux = 350)"));
+                    break;
+                case WARNING_HOT:
+                    // -> WARNING_COLD
+                    sensors.setMock(true, 15.0, 30.0, 350.0);
+                    Serial.println(F("[Test Mode] Mocking WARNING_COLD. (Temp = 15C, Humid = 30%, Lux = 350)"));
+                    break;
+                case WARNING_COLD:
+                    // -> SLEEP_MODE
+                    sensors.setMock(true, 25.0, 55.0, 20.0);
+                    Serial.println(F("[Test Mode] Mocking SLEEP_MODE. (Temp = 25C, Humid = 55%, Lux = 20)"));
+                    break;
+                case SLEEP_MODE:
+                    // -> WARNING_DARK
+                    sensors.setMock(true, 25.0, 55.0, 100.0);
+                    lastTimeLightChecked = millis() - 605000; // Bypass the 10 min threshold
+                    Serial.println(F("[Test Mode] Mocking WARNING_DARK. (Temp = 25C, Humid = 55%, Lux = 100)"));
+                    break;
+                case WARNING_DARK:
+                default:
+                    // -> Back to NORMAL_HAPPY (disable mock)
+                    sensors.setMock(false, 0, 0, 0);
+                    Serial.println(F("[Test Mode] Disabling Mock (Returning to NORMAL_HAPPY)."));
+                    break;
+            }
+            // Reset alarmMuted when we switch test states so that the new state's alarm can sound
+            alarmMuted = false;
+            actuators.setMuted(false);
             return;
         }
-        Serial.println(F("Handling Single Tap."));
-        if (currentState == NORMAL_HAPPY) {
-            actuators.triggerDoubleBeep(2000, 80, 50); // Play happy beep
-            emote.triggerLaugh(); // Trigger RoboEyes laugh animation
+
+        // Normal mode single tap handling
+        Serial.println(F("Handling Single Tap in Normal Mode."));
+
+        // Check if an alarm / song is active and audible
+        bool alarmSounding = !alarmMuted && (currentState == DANGER_FIRE || currentState == DANGER_HUMID || actuators.isSongPlaying());
+
+        if (alarmSounding) {
+            Serial.println(F("Alarm is active and sounding. Silencing it (Muting)."));
+            alarmMuted = true;
+            actuators.setMuted(true);
         } else {
-            emote.triggerConfused(); // Play confused animation when warning/danger is active
+            // Toggle parameter screen
+            showParamScreen = !showParamScreen;
+            emote.setShowParamScreen(showParamScreen);
+            Serial.print(F("Toggling Parameter Screen Mode. Active: "));
+            Serial.println(showParamScreen);
+            
+            actuators.triggerSingleBeep(1500, 100); // Beep to indicate screen change
         }
     }
 
@@ -296,7 +370,7 @@ private:
         Serial.print(F("Triggering DANCE MODE with Song ID: "));
         Serial.println(songId);
         isDancing = true;
-        danceEndTime = millis() + 60000; // Max dance for 60 seconds (or until song finishes)
+        danceEndTime = millis() + 10000; // Max dance for 10 seconds (or until song finishes)
         preDanceState = currentState;   // Save previous state to restore later
         currentState = DANCE_MODE;
         
@@ -328,7 +402,7 @@ private:
         }
 
         unsigned long now = millis();
-        bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || mockTouchTriggered;
+        bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || mockTouchTriggered || blynkTouchState;
 
         // Detect touch press (rising edge)
         if (isTouched && !lastTouchState) {
@@ -351,16 +425,26 @@ private:
         // Detect long press while holding (does not wait for release)
         if (isTouched && !longPressDetected) {
             unsigned long pressDuration = now - touchStartTime;
-            if (pressDuration >= 3000) { // Held for 3 seconds
+            if (pressDuration >= 2000) { // Held for 2 seconds
                 longPressDetected = true;
                 tapCount = 0; // Clear pending taps
                 
-                showParamScreen = !showParamScreen;
-                emote.setShowParamScreen(showParamScreen);
-                Serial.print(F("Toggling Parameter Screen Mode. Active: "));
-                Serial.println(showParamScreen);
+                testModeActive = !testModeActive;
+                Serial.print(F("Toggling Test Mode. Active: "));
+                Serial.println(testModeActive);
                 
-                actuators.triggerSingleBeep(1500, 100); // Beep to indicate screen change
+                if (testModeActive) {
+                    alarmMuted = false;
+                    actuators.setMuted(false);
+                    // Double high beep for entering test mode
+                    actuators.triggerDoubleBeep(2000, 100, 100);
+                } else {
+                    sensors.setMock(false, 0, 0, 0);
+                    alarmMuted = false;
+                    actuators.setMuted(false);
+                    // Lower beep for leaving test mode
+                    actuators.triggerSingleBeep(1000, 200);
+                }
             }
         }
 
@@ -390,26 +474,32 @@ private:
             Serial.println(cmd);
             
             if (cmd.equalsIgnoreCase("test 1") || cmd.equalsIgnoreCase("danger_fire")) {
+                testModeActive = true;
                 sensors.setMock(true, 45.0, 50.0, 350.0);
                 Serial.println(F("[TEST MODE] Enabled DANGER_FIRE simulation. (Temp = 45C, Humid = 50%, Lux = 350)"));
             }
             else if (cmd.equalsIgnoreCase("test 2") || cmd.equalsIgnoreCase("danger_humid")) {
+                testModeActive = true;
                 sensors.setMock(true, 25.0, 90.0, 350.0);
                 Serial.println(F("[TEST MODE] Enabled DANGER_HUMID simulation. (Temp = 25C, Humid = 90%, Lux = 350)"));
             }
             else if (cmd.equalsIgnoreCase("test 3") || cmd.equalsIgnoreCase("warning_hot")) {
+                testModeActive = true;
                 sensors.setMock(true, 35.0, 50.0, 350.0);
                 Serial.println(F("[TEST MODE] Enabled WARNING_HOT simulation. (Temp = 35C, Humid = 50%, Lux = 350)"));
             }
             else if (cmd.equalsIgnoreCase("test 4") || cmd.equalsIgnoreCase("warning_cold")) {
+                testModeActive = true;
                 sensors.setMock(true, 15.0, 30.0, 350.0);
                 Serial.println(F("[TEST MODE] Enabled WARNING_COLD simulation. (Temp = 15C, Humid = 30%, Lux = 350)"));
             }
             else if (cmd.equalsIgnoreCase("test 5") || cmd.equalsIgnoreCase("sleep_mode")) {
+                testModeActive = true;
                 sensors.setMock(true, 25.0, 55.0, 20.0);
                 Serial.println(F("[TEST MODE] Enabled SLEEP_MODE simulation. (Temp = 25C, Humid = 55%, Lux = 20)"));
             }
             else if (cmd.equalsIgnoreCase("test 6") || cmd.equalsIgnoreCase("warning_dark")) {
+                testModeActive = true;
                 sensors.setMock(true, 25.0, 55.0, 100.0);
                 lastTimeLightChecked = millis() - 605000; // Bypass the 10 min threshold
                 Serial.println(F("[TEST MODE] Enabled WARNING_DARK simulation. (Temp = 25C, Humid = 55%, Lux = 100). Bypassed 10-min timer."));
@@ -425,6 +515,7 @@ private:
                 triggerDanceMode();
             }
             else if (cmd.equalsIgnoreCase("normal") || cmd.equalsIgnoreCase("exit")) {
+                testModeActive = false;
                 sensors.setMock(false, 0, 0, 0);
                 Serial.println(F("[TEST MODE] Disabled simulation. Resuming physical sensors reading."));
             }
