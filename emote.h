@@ -1,7 +1,7 @@
 #ifndef EMOTE_H
 #define EMOTE_H
 
-#include "FluxGarage_RoboEyes.h"
+#include <FluxGarage_RoboEyes.h>
 #include "robot_state.h"
 #include "sensors.h"
 #include <Adafruit_GFX.h>
@@ -107,42 +107,42 @@ public:
 
     case DANGER_HUMID:
       eyes.open();
-      eyes.setMood(RE_TIRED);
+      eyes.setMood(TIRED);
       eyes.setSweat(true);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(RE_DEFAULT);
+      eyes.setPosition(DEFAULT);
       break;
 
     case WARNING_HOT:
       eyes.open();
-      eyes.setMood(RE_TIRED);
+      eyes.setMood(TIRED);
       eyes.setSweat(false);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(RE_DEFAULT);
+      eyes.setPosition(DEFAULT);
       break;
 
     case WARNING_COLD:
       eyes.open();
-      eyes.setMood(RE_TIRED);
+      eyes.setMood(TIRED);
       eyes.setSweat(false);
       eyes.setHFlicker(true, 2); // Shiver!
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(RE_DEFAULT);
+      eyes.setPosition(DEFAULT);
       break;
 
     case WARNING_DARK:
       eyes.open();
-      eyes.setMood(RE_ANGRY); // Squinting
+      eyes.setMood(ANGRY); // Squinting
       eyes.setSweat(false);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);
       eyes.setIdleMode(false);
-      eyes.setPosition(RE_N); // Look up
+      eyes.setPosition(N); // Look up
       break;
 
     case SLEEP_MODE:
@@ -151,12 +151,12 @@ public:
       eyes.setHFlicker(false);
       eyes.setAutoblinker(false);
       eyes.setIdleMode(false);
-      eyes.setPosition(RE_DEFAULT);
+      eyes.setPosition(DEFAULT);
       break;
 
     case NORMAL_HAPPY:
       eyes.open();
-      eyes.setMood(RE_HAPPY);
+      eyes.setMood(HAPPY);
       eyes.setSweat(false);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(true, 3, 4);
@@ -165,12 +165,12 @@ public:
 
     case DANCE_MODE:
       eyes.open();
-      eyes.setMood(RE_HAPPY);
+      eyes.setMood(HAPPY);
       eyes.setSweat(false);
       eyes.setHFlicker(false);
       eyes.setAutoblinker(false); // No autoblinker while dancing
       eyes.setIdleMode(false);
-      eyes.setPosition(RE_DEFAULT);
+      eyes.setPosition(DEFAULT);
       break;
     }
   }
@@ -303,7 +303,7 @@ public:
       if (currentState == DANCE_MODE && !isWinking) {
         // Roll eyes in a circle during Dance Mode
         int directionIndex = (now / 200) % 8;
-        int directions[] = {RE_N, RE_NE, RE_E, RE_SE, RE_S, RE_SW, RE_W, RE_NW};
+        int directions[] = {N, NE, E, SE, S, SW, W, NW};
         eyes.setPosition(directions[directionIndex]);
       }
       // Update standard RoboEyes animations
