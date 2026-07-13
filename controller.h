@@ -18,41 +18,48 @@
 
 class Controller {
 private:
+    // ==========================================
+    // Subsystem Instances
+    // ==========================================
     Sensors sensors;
     RobotServo servo;
     Actuators actuators;
     Emote emote;
     BlynkService blynk;
 
+    // ==========================================
+    // Core Controller State
+    // ==========================================
     RobotState currentState = NORMAL_HAPPY;
-    
-    // Mode flags
-    bool testModeActive = false;
-    bool alarmMuted = false;
-    
-    // Timers
-    unsigned long lastTimeLightChecked = 0;
-    unsigned long lastTimeBuzzerSounded = 0;
-    
-    // Debounce for touch sensor
-    bool touchActive = false;
-    unsigned long lastTouchTime = 0;
-    bool mockTouchTriggered = false;
-    bool blynkTouchState = false;
+    bool testModeActive = false;    // Toggled by long pressing physical touch sensor
+    bool alarmMuted = false;        // Silences active warning buzzers
 
-    // Touch state machine variables
-    bool lastTouchState = false;
+    // ==========================================
+    // Timers & Intervals
+    // ==========================================
+    unsigned long lastTimeLightChecked = 0;  // Tracks lux threshold duration
+    unsigned long lastTimeBuzzerSounded = 0; // Tracks interval between warning beeps
+
+    // ==========================================
+    // Touch Input & Gesture Variables
+    // ==========================================
+    bool blynkTouchState = false;   // Virtual touch state from Blynk app
+    bool lastTouchState = false;    // For edge detection
     unsigned long touchStartTime = 0;
     unsigned long lastTapTime = 0;
     int tapCount = 0;
     bool longPressDetected = false;
 
-    // Dance Mode control variables
+    // ==========================================
+    // Dance Mode Control Variables
+    // ==========================================
     bool isDancing = false;
     unsigned long danceEndTime = 0;
-    RobotState preDanceState = NORMAL_HAPPY;
+    RobotState preDanceState = NORMAL_HAPPY; // Remembers state before dancing
 
-    // Screen state
+    // ==========================================
+    // UI Screen State
+    // ==========================================
     bool showParamScreen = false;
     bool returnToParamScreenAfterDance = false;
 
@@ -63,12 +70,15 @@ public:
         actuators(LED_PIN, BUZZER_PIN) 
     {}
 
+    /**
+     * @brief Initializes serial and all integrated sub-systems.
+     */
     void begin() {
         Serial.begin(115200);
         while (!Serial && millis() < 3000); // Wait briefly for Serial debug
         Serial.println(F("Initializing Robot Controller (MVC)..."));
 
-        // Set pins
+        // Setup pins
         pinMode(TOUCH_PIN, INPUT);
 
         // Initialize sub-systems
@@ -78,10 +88,8 @@ public:
         emote.begin(&sensors);
         blynk.begin();
 
-        // Set initial state
-        servo.setState(currentState);
-        actuators.setState(currentState);
-        emote.setExpression(currentState);
+        // Apply initial state
+        applyStateToSubsystems();
         
         lastTimeLightChecked = millis();
         lastTimeBuzzerSounded = millis();
@@ -89,45 +97,30 @@ public:
         Serial.println(F("Robot Controller fully initialized."));
     }
 
+    /**
+     * @brief The main run loop, to be called inside Arduino's loop().
+     */
     void update() {
-        // Read serial commands for simulation mode
-        handleSerialCommands();
-
-        // 1. Update sensor data (non-blocking)
+        // 1. Update non-blocking sensor readings
         sensors.update();
 
-        // Check if Dance Mode timer has ended or song completed
+        // 2. Check if Dance Mode timer has elapsed or the song has completed
         if (isDancing) {
             unsigned long now = millis();
             bool songFinished = !actuators.isSongPlaying();
             if (now >= danceEndTime || songFinished) {
                 Serial.println(F("[Dance Mode] Dance completed. Returning to normal."));
-                isDancing = false;
-                actuators.stopSong();
-                currentState = preDanceState;
-                servo.setState(currentState);
-                actuators.setState(currentState);
-                emote.setExpression(currentState);
-
-                if (returnToParamScreenAfterDance) {
-                    showParamScreen = true;
-                    emote.setShowParamScreen(true);
-                    returnToParamScreenAfterDance = false;
-                }
+                stopDanceMode();
             }
         }
 
-        // 2. Evaluate state transitions (only if not dancing)
+        // 3. Evaluate environmental state transitions and buzzer triggers
         if (!isDancing) {
             evaluateState();
-        }
-
-        // 3. Update non-blocking warning buzzer intervals (only if not dancing)
-        if (!isDancing) {
             updateBuzzerReminders();
         }
 
-        // 4. Read interactive touch input
+        // 4. Update and parse physical/virtual touch gestures
         updateTouch();
 
         // 5. Run continuous updates for sub-systems
@@ -135,7 +128,7 @@ public:
         actuators.update();
         emote.update();
 
-        // 6. Update Blynk
+        // 6. Push telemetry to Blynk IoT cloud
         blynk.update(
             sensors.getTemperature(),
             sensors.getHumidity(),
@@ -145,6 +138,9 @@ public:
         );
     }
 
+    /**
+     * @brief Plays a song triggered via Blynk.
+     */
     void playSongBlynk(int songId) {
         if (songId >= 1 && songId <= 3) {
             triggerDanceMode(songId);
@@ -153,6 +149,9 @@ public:
         }
     }
 
+    /**
+     * @brief Updates the virtual touch sensor state received from Blynk.
+     */
     void setBlynkTouch(bool pressed) {
         blynkTouchState = pressed;
         Serial.print(F("[Blynk] Virtual touch state: "));
@@ -160,6 +159,41 @@ public:
     }
 
 private:
+    // ==========================================
+    // State & Transition Management
+    // ==========================================
+
+    /**
+     * @brief Updates sub-systems to match the current state.
+     */
+    void applyStateToSubsystems() {
+        servo.setState(currentState);
+        actuators.setState(currentState);
+        emote.setExpression(currentState);
+    }
+
+    /**
+     * @brief Centralized state transition handler.
+     */
+    void changeState(RobotState newState, bool resetAlarm = true) {
+        if (currentState != newState) {
+            Serial.print(F("State transition: "));
+            Serial.print(stateToString(currentState));
+            Serial.print(F(" -> "));
+            Serial.println(stateToString(newState));
+
+            currentState = newState;
+            if (resetAlarm) {
+                alarmMuted = false;
+            }
+            
+            applyStateToSubsystems();
+        }
+    }
+
+    /**
+     * @brief Analyzes environmental sensor values to decide target RobotState.
+     */
     void evaluateState() {
         float temp = sensors.getTemperature();
         float humid = sensors.getHumidity();
@@ -169,12 +203,12 @@ private:
 
         RobotState nextState = NORMAL_HAPPY;
 
-        // Reset the weak-light timer if we are not in the weak-light range
+        // Reset the weak-light timer if light level is out of the warning range
         if (lux >= 150.0 || lux < 50.0) {
             lastTimeLightChecked = now;
         }
 
-        // Evaluate priority tree (highest priority first)
+        // State Priority Tree
         if (temp > 42.0) {
             nextState = DANGER_FIRE;
         } 
@@ -191,49 +225,27 @@ private:
             nextState = SLEEP_MODE;
         } 
         else if (lux < 150.0) {
-            // Check if light has been weak (<150) for more than 10 mins (600,000 ms)
+            // Check if light is weak for more than 10 continuous minutes
             if (now - lastTimeLightChecked > 600000) {
                 nextState = WARNING_DARK;
             } else {
-                // If 10 minutes hasn't elapsed, keep previous state if it was WARNING_DARK, 
-                // otherwise fall back to NORMAL_HAPPY until the 10 mins pass.
-                if (currentState == WARNING_DARK) {
-                    nextState = WARNING_DARK;
-                } else {
-                    nextState = NORMAL_HAPPY;
-                }
+                nextState = (currentState == WARNING_DARK) ? WARNING_DARK : NORMAL_HAPPY;
             }
         } 
         else {
             nextState = NORMAL_HAPPY;
         }
 
-        // Apply state transition
+        // Apply state changes and configure appropriate initial action triggers
         if (nextState != currentState) {
-            Serial.print(F("State transition: "));
-            Serial.print(stateToString(currentState));
-            Serial.print(F(" -> "));
-            Serial.println(stateToString(nextState));
-
-            currentState = nextState;
+            changeState(nextState, true);
             
-            // Reset alarm muted on state transition
-            alarmMuted = false;
-            
-            // Dispatch state change to sub-systems
-            servo.setState(currentState);
-            actuators.setState(currentState);
-            emote.setExpression(currentState);
-            
-            // Set up buzzer timer so it triggers beeps immediately on warning entry
             if (currentState == WARNING_HOT) {
                 lastTimeBuzzerSounded = now - 300000;
-                // Auto play Despacito (Song 2) once on hot warning
-                actuators.playSong(2);
+                actuators.playSong(2); // Auto play Despacito (Song 2) once
             } else if (currentState == WARNING_COLD) {
                 lastTimeBuzzerSounded = now;
-                // Auto play Jingle Bells (Song 3) once on cold warning
-                actuators.playSong(3);
+                actuators.playSong(3); // Auto play Jingle Bells (Song 3) once
             } else if (currentState == WARNING_DARK) {
                 lastTimeBuzzerSounded = now - 60000;
                 actuators.stopSong();
@@ -244,87 +256,119 @@ private:
         }
     }
 
+    /**
+     * @brief Plays repetitive alarm beeps when in warning states (unless muted).
+     */
     void updateBuzzerReminders() {
-        if (alarmMuted) {
+        if (alarmMuted || actuators.isSongPlaying()) {
             return;
         }
 
         unsigned long now = millis();
         
-        // If a song is currently playing, do not play warning beeps
-        if (actuators.isSongPlaying()) {
-            return;
-        }
-        
         if (currentState == WARNING_HOT) {
             // Beep every 5 minutes (300,000 ms)
             if (now - lastTimeBuzzerSounded >= 300000) {
                 lastTimeBuzzerSounded = now;
-                actuators.triggerSingleBeep(1200, 150); // Short beep
+                actuators.triggerSingleBeep(1200, 150);
             }
         } 
         else if (currentState == WARNING_DARK) {
             // Double beep every 1 minute (60,000 ms)
             if (now - lastTimeBuzzerSounded >= 60000) {
                 lastTimeBuzzerSounded = now;
-                actuators.triggerDoubleBeep(1500, 80, 80); // Double beep with 80ms gap
+                actuators.triggerDoubleBeep(1500, 80, 80);
             }
         }
     }
 
+    // ==========================================
+    // Dance Mode Controls
+    // ==========================================
+
+    /**
+     * @brief Triggers Dance Mode and locks the state.
+     */
+    void triggerDanceMode(int songId = 1) {
+        Serial.print(F("Triggering DANCE MODE with Song ID: "));
+        Serial.println(songId);
+        isDancing = true;
+        danceEndTime = millis() + 10000; // Limit dance to 10 seconds max
+        preDanceState = currentState;
+        
+        changeState(DANCE_MODE, false);
+        actuators.playSong(songId);
+    }
+
+    /**
+     * @brief Stops Dance Mode and restores the previous state.
+     */
+    void stopDanceMode() {
+        if (isDancing) {
+            Serial.println(F("[Dance Mode] Stopped."));
+            isDancing = false;
+            actuators.stopSong();
+            
+            changeState(preDanceState, false);
+
+            if (returnToParamScreenAfterDance) {
+                showParamScreen = true;
+                emote.setShowParamScreen(true);
+                returnToParamScreenAfterDance = false;
+            }
+        }
+    }
+
+    // ==========================================
+    // Gesture & Touch Event Handlers
+    // ==========================================
+
+    /**
+     * @brief Mutes sirens or cycles screen mode on physical touch single tap.
+     */
     void handleSingleTap() {
+        // If in physical test/simulation mode, tap to cycle states
         if (testModeActive) {
             Serial.println(F("[Test Mode] Single tap detected. Cycling state."));
-            // Cycle test states by checking currentState and setting mock sensor values
             switch (currentState) {
                 case NORMAL_HAPPY:
-                    // -> DANGER_FIRE
-                    sensors.setMock(true, 45.0, 50.0, 350.0);
-                    Serial.println(F("[Test Mode] Mocking DANGER_FIRE. (Temp = 45C, Humid = 50%, Lux = 350)"));
+                    sensors.setMock(true, 45.0, 50.0, 350.0); // -> DANGER_FIRE
+                    Serial.println(F("[Test Mode] Mocking DANGER_FIRE."));
                     break;
                 case DANGER_FIRE:
-                    // -> DANGER_HUMID
-                    sensors.setMock(true, 25.0, 90.0, 350.0);
-                    Serial.println(F("[Test Mode] Mocking DANGER_HUMID. (Temp = 25C, Humid = 90%, Lux = 350)"));
+                    sensors.setMock(true, 25.0, 90.0, 350.0); // -> DANGER_HUMID
+                    Serial.println(F("[Test Mode] Mocking DANGER_HUMID."));
                     break;
                 case DANGER_HUMID:
-                    // -> WARNING_HOT
-                    sensors.setMock(true, 35.0, 50.0, 350.0);
-                    Serial.println(F("[Test Mode] Mocking WARNING_HOT. (Temp = 35C, Humid = 50%, Lux = 350)"));
+                    sensors.setMock(true, 35.0, 50.0, 350.0); // -> WARNING_HOT
+                    Serial.println(F("[Test Mode] Mocking WARNING_HOT."));
                     break;
                 case WARNING_HOT:
-                    // -> WARNING_COLD
-                    sensors.setMock(true, 15.0, 30.0, 350.0);
-                    Serial.println(F("[Test Mode] Mocking WARNING_COLD. (Temp = 15C, Humid = 30%, Lux = 350)"));
+                    sensors.setMock(true, 15.0, 30.0, 350.0); // -> WARNING_COLD
+                    Serial.println(F("[Test Mode] Mocking WARNING_COLD."));
                     break;
                 case WARNING_COLD:
-                    // -> SLEEP_MODE
-                    sensors.setMock(true, 25.0, 55.0, 20.0);
-                    Serial.println(F("[Test Mode] Mocking SLEEP_MODE. (Temp = 25C, Humid = 55%, Lux = 20)"));
+                    sensors.setMock(true, 25.0, 55.0, 20.0);  // -> SLEEP_MODE
+                    Serial.println(F("[Test Mode] Mocking SLEEP_MODE."));
                     break;
                 case SLEEP_MODE:
-                    // -> WARNING_DARK
-                    sensors.setMock(true, 25.0, 55.0, 100.0);
-                    lastTimeLightChecked = millis() - 605000; // Bypass the 10 min threshold
-                    Serial.println(F("[Test Mode] Mocking WARNING_DARK. (Temp = 25C, Humid = 55%, Lux = 100)"));
+                    sensors.setMock(true, 25.0, 55.0, 100.0); // -> WARNING_DARK
+                    lastTimeLightChecked = millis() - 605000;
+                    Serial.println(F("[Test Mode] Mocking WARNING_DARK."));
                     break;
                 case WARNING_DARK:
                 default:
-                    // -> Back to NORMAL_HAPPY (disable mock)
-                    sensors.setMock(false, 0, 0, 0);
+                    sensors.setMock(false, 0, 0, 0); // Disable mock and return to physical sensors
                     Serial.println(F("[Test Mode] Disabling Mock (Returning to NORMAL_HAPPY)."));
                     break;
             }
-            // Reset alarmMuted when we switch test states so that the new state's alarm can sound
             alarmMuted = false;
             actuators.setMuted(false);
             return;
         }
 
-        // Normal mode single tap handling
+        // Normal Mode single tap handling
         Serial.println(F("Handling Single Tap in Normal Mode."));
-
-        // Check if an alarm / song is active and audible
         bool alarmSounding = !alarmMuted && (currentState == DANGER_FIRE || currentState == DANGER_HUMID || actuators.isSongPlaying());
 
         if (alarmSounding) {
@@ -332,16 +376,18 @@ private:
             alarmMuted = true;
             actuators.setMuted(true);
         } else {
-            // Toggle parameter screen
             showParamScreen = !showParamScreen;
             emote.setShowParamScreen(showParamScreen);
             Serial.print(F("Toggling Parameter Screen Mode. Active: "));
             Serial.println(showParamScreen);
             
-            actuators.triggerSingleBeep(1500, 100); // Beep to indicate screen change
+            actuators.triggerSingleBeep(1500, 100);
         }
     }
 
+    /**
+     * @brief Performs a wink & shake head gesture on double tap.
+     */
     void handleDoubleTap() {
         if (showParamScreen) {
             Serial.println(F("Double Tap on parameter screen. Ignored."));
@@ -353,6 +399,9 @@ private:
         servo.triggerGentleShake();
     }
 
+    /**
+     * @brief Enters dance mode on triple tap.
+     */
     void handleTripleTap() {
         Serial.println(F("Handling Triple Tap (Dance Mode)."));
         if (showParamScreen) {
@@ -362,47 +411,20 @@ private:
         } else {
             returnToParamScreenAfterDance = false;
         }
-        triggerDanceMode(1); // Play Super Mario (Song 1)
-        danceEndTime = millis() + 5000; // Limit dance to 5 seconds
+        triggerDanceMode(1); // Play Super Mario theme
+        danceEndTime = millis() + 5000; // Limit this specific dance gesture to 5 seconds
     }
 
-    void triggerDanceMode(int songId = 1) {
-        Serial.print(F("Triggering DANCE MODE with Song ID: "));
-        Serial.println(songId);
-        isDancing = true;
-        danceEndTime = millis() + 10000; // Max dance for 10 seconds (or until song finishes)
-        preDanceState = currentState;   // Save previous state to restore later
-        currentState = DANCE_MODE;
-        
-        // Dispatch state change to sub-systems
-        servo.setState(currentState);
-        actuators.setState(currentState);
-        emote.setExpression(currentState);
-        
-        // Start song playback
-        actuators.playSong(songId);
-    }
-
-    void stopDanceMode() {
-        if (isDancing) {
-            Serial.println(F("[Dance Mode] Stopped."));
-            isDancing = false;
-            actuators.stopSong();
-            currentState = preDanceState;
-            servo.setState(currentState);
-            actuators.setState(currentState);
-            emote.setExpression(currentState);
-        }
-    }
-
+    /**
+     * @brief Detects touch gestures (tap, double-tap, triple-tap, long-press).
+     */
     void updateTouch() {
         if (isDancing) {
-            mockTouchTriggered = false;
             return;
         }
 
         unsigned long now = millis();
-        bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || mockTouchTriggered || blynkTouchState;
+        bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || blynkTouchState;
 
         // Detect touch press (rising edge)
         if (isTouched && !lastTouchState) {
@@ -414,12 +436,11 @@ private:
         if (!isTouched && lastTouchState) {
             unsigned long pressDuration = now - touchStartTime;
 
-            // Only count as tap if it wasn't already triggered as a long press
+            // Register tap if released within normal duration and not part of a long press
             if (!longPressDetected && pressDuration > 50 && pressDuration < 600) {
                 tapCount++;
                 lastTapTime = now;
             }
-            mockTouchTriggered = false; // Reset mock trigger
         }
 
         // Detect long press while holding (does not wait for release)
@@ -427,7 +448,7 @@ private:
             unsigned long pressDuration = now - touchStartTime;
             if (pressDuration >= 2000) { // Held for 2 seconds
                 longPressDetected = true;
-                tapCount = 0; // Clear pending taps
+                tapCount = 0; // Cancel pending tap detections
                 
                 testModeActive = !testModeActive;
                 Serial.print(F("Toggling Test Mode. Active: "));
@@ -436,19 +457,17 @@ private:
                 if (testModeActive) {
                     alarmMuted = false;
                     actuators.setMuted(false);
-                    // Double high beep for entering test mode
                     actuators.triggerDoubleBeep(2000, 100, 100);
                 } else {
                     sensors.setMock(false, 0, 0, 0);
                     alarmMuted = false;
                     actuators.setMuted(false);
-                    // Lower beep for leaving test mode
                     actuators.triggerSingleBeep(1000, 200);
                 }
             }
         }
 
-        // Evaluate tap count after a short timeout (400ms after last tap)
+        // Dispatch tap callbacks after a short timeout (400ms gap after last touch release)
         if (tapCount > 0 && (now - lastTapTime > 400)) {
             if (tapCount == 1) {
                 handleSingleTap();
@@ -457,84 +476,15 @@ private:
             } else if (tapCount >= 3) {
                 handleTripleTap();
             }
-            tapCount = 0; // Reset
+            tapCount = 0;
         }
 
         lastTouchState = isTouched;
     }
 
-    void handleSerialCommands() {
-        if (Serial.available() > 0) {
-            String cmd = Serial.readStringUntil('\n');
-            cmd.trim();
-            
-            if (cmd.length() == 0) return;
-            
-            Serial.print(F("Received Command: "));
-            Serial.println(cmd);
-            
-            if (cmd.equalsIgnoreCase("test 1") || cmd.equalsIgnoreCase("danger_fire")) {
-                testModeActive = true;
-                sensors.setMock(true, 45.0, 50.0, 350.0);
-                Serial.println(F("[TEST MODE] Enabled DANGER_FIRE simulation. (Temp = 45C, Humid = 50%, Lux = 350)"));
-            }
-            else if (cmd.equalsIgnoreCase("test 2") || cmd.equalsIgnoreCase("danger_humid")) {
-                testModeActive = true;
-                sensors.setMock(true, 25.0, 90.0, 350.0);
-                Serial.println(F("[TEST MODE] Enabled DANGER_HUMID simulation. (Temp = 25C, Humid = 90%, Lux = 350)"));
-            }
-            else if (cmd.equalsIgnoreCase("test 3") || cmd.equalsIgnoreCase("warning_hot")) {
-                testModeActive = true;
-                sensors.setMock(true, 35.0, 50.0, 350.0);
-                Serial.println(F("[TEST MODE] Enabled WARNING_HOT simulation. (Temp = 35C, Humid = 50%, Lux = 350)"));
-            }
-            else if (cmd.equalsIgnoreCase("test 4") || cmd.equalsIgnoreCase("warning_cold")) {
-                testModeActive = true;
-                sensors.setMock(true, 15.0, 30.0, 350.0);
-                Serial.println(F("[TEST MODE] Enabled WARNING_COLD simulation. (Temp = 15C, Humid = 30%, Lux = 350)"));
-            }
-            else if (cmd.equalsIgnoreCase("test 5") || cmd.equalsIgnoreCase("sleep_mode")) {
-                testModeActive = true;
-                sensors.setMock(true, 25.0, 55.0, 20.0);
-                Serial.println(F("[TEST MODE] Enabled SLEEP_MODE simulation. (Temp = 25C, Humid = 55%, Lux = 20)"));
-            }
-            else if (cmd.equalsIgnoreCase("test 6") || cmd.equalsIgnoreCase("warning_dark")) {
-                testModeActive = true;
-                sensors.setMock(true, 25.0, 55.0, 100.0);
-                lastTimeLightChecked = millis() - 605000; // Bypass the 10 min threshold
-                Serial.println(F("[TEST MODE] Enabled WARNING_DARK simulation. (Temp = 25C, Humid = 55%, Lux = 100). Bypassed 10-min timer."));
-            }
-            else if (cmd.equalsIgnoreCase("test 7") || cmd.equalsIgnoreCase("touch")) {
-                mockTouchTriggered = true;
-                Serial.println(F("[TEST MODE] Triggered mock touch interaction."));
-            }
-            else if (cmd.equalsIgnoreCase("test 8") || cmd.equalsIgnoreCase("double_tap")) {
-                handleDoubleTap();
-            }
-            else if (cmd.equalsIgnoreCase("test 9") || cmd.equalsIgnoreCase("long_press") || cmd.equalsIgnoreCase("dance")) {
-                triggerDanceMode();
-            }
-            else if (cmd.equalsIgnoreCase("normal") || cmd.equalsIgnoreCase("exit")) {
-                testModeActive = false;
-                sensors.setMock(false, 0, 0, 0);
-                Serial.println(F("[TEST MODE] Disabled simulation. Resuming physical sensors reading."));
-            }
-            else {
-                Serial.println(F("Unknown command! Available commands:"));
-                Serial.println(F("  - test 1 / danger_fire"));
-                Serial.println(F("  - test 2 / danger_humid"));
-                Serial.println(F("  - test 3 / warning_hot"));
-                Serial.println(F("  - test 4 / warning_cold"));
-                Serial.println(F("  - test 5 / sleep_mode"));
-                Serial.println(F("  - test 6 / warning_dark"));
-                Serial.println(F("  - test 7 / touch"));
-                Serial.println(F("  - test 8 / double_tap"));
-                Serial.println(F("  - test 9 / long_press / dance"));
-                Serial.println(F("  - normal / exit"));
-            }
-        }
-    }
-
+    // ==========================================
+    // Telemetry Formatting Helpers
+    // ==========================================
     const char* stateToString(RobotState state) {
         switch (state) {
             case DANGER_FIRE:  return "DANGER_FIRE";

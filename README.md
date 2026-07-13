@@ -65,21 +65,9 @@ Cảm biến chạm được tích hợp hệ thống nhận diện cử chỉ t
 
 ---
 
-## 💻 Điều Khiển Qua Serial Monitor
-
-Khi kết nối robot với máy tính qua cổng USB (Baudrate `115200`), bạn có thể gửi các lệnh sau để kiểm tra trạng thái:
-- `test 1` / `danger_fire`: Kích hoạt giả lập cháy.
-- `test 2` / `danger_humid`: Kích hoạt giả lập ẩm cực cao.
-- `test 3` / `warning_hot`: Kích hoạt giả lập nóng.
-- `test 4` / `warning_cold`: Kích hoạt giả lập lạnh.
-- `test 5` / `sleep_mode`: Kích hoạt giả lập chế độ ngủ.
-- `test 6` / `warning_dark`: Kích hoạt giả lập thiếu sáng lâu.
-- `test 7` / `touch`: Giả lập 1 lần chạm tay vật lý.
-- `test 8` / `double_tap`: Giả lập 2 lần chạm (nháy mắt).
-- `test 9` / `dance`: Giả lập nhảy múa.
-- `normal` / `exit`: Thoát chế độ giả lập, quay về đọc cảm biến thật.
 
 ---
+
 
 ## 🛠️ Hướng Dẫn Cài Đặt & Cấu Hình
 
