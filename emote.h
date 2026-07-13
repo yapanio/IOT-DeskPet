@@ -1,11 +1,11 @@
 #ifndef EMOTE_H
 #define EMOTE_H
 
-#include <FluxGarage_RoboEyes.h>
 #include "robot_state.h"
 #include "sensors.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <FluxGarage_RoboEyes.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
