@@ -287,29 +287,6 @@ class Emote {
   }
 
   /**
-   * @brief Vẽ một bảng thông số nhỏ gọn ở má bên phải của robot khi gặp lửa cháy (DANGER_FIRE).
-   */
-  void drawMetricsOverlay(Adafruit_SSD1306* disp) {
-    if (sensors == nullptr) return;
-
-    disp->drawFastVLine(97, 0, 64, SSD1306_WHITE); // Đường kẻ dọc phân cách
-    disp->setTextSize(1);
-    disp->setTextColor(SSD1306_WHITE);
-
-    // Nhiệt độ
-    disp->setCursor(101, 4);  disp->print(F("T"));
-    disp->setCursor(101, 12); disp->print((int)round(sensors->getTemperature())); disp->print(F("C"));
-
-    // Độ ẩm
-    disp->setCursor(101, 24); disp->print(F("H"));
-    disp->setCursor(101, 32); disp->print((int)round(sensors->getHumidity())); disp->print(F("%"));
-
-    // Ánh sáng
-    disp->setCursor(101, 44); disp->print(F("L"));
-    disp->setCursor(101, 52); disp->print((int)round(sensors->getLightLux()));
-  }
-
-  /**
    * @brief Cập nhật vẽ mắt hoặc vẽ chữ X_X báo cháy tùy trạng thái. Gọi liên tục trong loop().
    */
   void update() {
@@ -331,19 +308,16 @@ class Emote {
     if (currentState == DANGER_FIRE) {
       display.clearDisplay();
 
-      // Mắt trái: Hình chữ X (tâm x=28, y=32)
-      display.drawLine(16, 20, 40, 44, SSD1306_WHITE); // Đường chéo xuống phải
-      display.drawLine(40, 20, 16, 44, SSD1306_WHITE); // Đường chéo xuống trái
+      // Mắt trái: Hình chữ X (tâm x=43, y=32)
+      display.drawLine(31, 20, 55, 44, SSD1306_WHITE); // Đường chéo xuống phải
+      display.drawLine(55, 20, 31, 44, SSD1306_WHITE); // Đường chéo xuống trái
 
-      // Mắt phải: Hình chữ X (tâm x=68, y=32)
-      display.drawLine(56, 20, 80, 44, SSD1306_WHITE);
-      display.drawLine(80, 20, 56, 44, SSD1306_WHITE);
+      // Mắt phải: Hình chữ X (tâm x=85, y=32)
+      display.drawLine(73, 20, 97, 44, SSD1306_WHITE); // Đường chéo xuống phải
+      display.drawLine(97, 20, 73, 44, SSD1306_WHITE); // Đường chéo xuống trái
 
-      // Miệng: Dấu gạch ngang _ ở giữa (y=48)
-      display.drawLine(43, 48, 53, 48, SSD1306_WHITE);
-
-      // Vẽ thêm thông số nhỏ bên phải màn hình
-      drawMetricsOverlay(&display);
+      // Miệng: Dấu gạch ngang _ ở giữa (x=58..70, y=48)
+      display.drawLine(58, 48, 70, 48, SSD1306_WHITE);
 
       display.display();
       return;
