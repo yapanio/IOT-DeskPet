@@ -1,94 +1,86 @@
 /**
  * @file Project.ino
- * @brief Điểm khởi đầu (Entry Point) của chương trình robot thú cưng IOT DeskPet.
+ * @brief Đây là ngôi nhà chính của chú Robot thú cưng DeskPet!
+ * 
+ * Hãy tưởng tượng chú Robot này giống như một chú cún con bằng máy.
+ * File này là nơi chú Robot bắt đầu thức dậy và hoạt động suốt cả ngày.
  *
- * File này là file chính của Arduino. Arduino IDE sẽ tự động
- * gọi setup() một lần khi khởi động, và gọi loop() liên tục sau đó.
+ * Chú Robot có hai việc chính để làm:
+ *  1. Thức dậy (setup): Robot sẽ mở mắt, kiểm tra xem chân tay, cảm biến có chạy tốt không.
+ *  2. Hoạt động liên tục (loop): Robot cứ lặp đi lặp lại việc kiểm tra môi trường và chơi đùa với chúng ta.
  *
- * Toàn bộ logic phức tạp được đóng gói trong class Controller (controller.h).
- * File này chỉ:
- *  1. Khai báo đối tượng robotController
- *  2. Đăng ký các hàm callback từ Blynk (BLYNK_WRITE)
- *  3. Gọi begin() và update() cho controller
- *
- * BLYNK VIRTUAL PINS:
- *  V5 <- Nhận ID bài nhạc từ ứng dụng Blynk (1=Mario, 2=Despacito, 3=Jingle Bells)
- *  V6 <- Nhận lệnh chạm ảo (1=Nhấn, 0=Thả)
+ * Ngoài ra, robot còn có "tai thần kỳ" (Blynk) để nghe lời chúng ta ra lệnh từ xa bằng điện thoại nữa đấy!
  *
  * =====================================
- * NHÓM THỰC HIỆN:
+ * CÁC BẠN NHỎ ĐÃ TẠO RA ROBOT:
  *  - Nguyễn Huy Nhật  (HE204465)
  *  - Lưu Chí Kiên     (HE204365)
  *  - Phạm Công Hùng   (HEXXXXXX)
- * TRƯỜNG: FPT University
- * MÔN HỌC: IOT102 - Internet of Things
+ * Trường đại học FPT
  * =====================================
  */
 
-// Bao gồm toàn bộ logic robot từ file controller.h
+// Lấy "sách hướng dẫn điều khiển" robot từ file controller.h
 #include "controller.h"
 
 // ===================================================
-// KHAI BÁO ĐỐI TƯỢNG ROBOT CONTROLLER (Toàn cục)
+// TẠO RA MỘT CHÚ ROBOT (Đối tượng Robot Controller)
 // ===================================================
-// Đây là "bộ não" của robot - chứa tất cả các module con
+// Dòng này giống như chúng ta lắp ráp một chú robot hoàn chỉnh.
+// Chú robot này tên là "robotController", có đầy đủ mắt, mũi, tai, và còi.
 Controller robotController;
 
 // ===================================================
-// BLYNK CALLBACKS - Hàm được gọi tự động khi nhận dữ liệu từ Blynk
+// TAI THẦN KỲ CỦA ROBOT - Nghe lệnh từ điện thoại (Blynk)
 // ===================================================
 
 /**
- * @brief Nhận lệnh phát nhạc từ Blynk Virtual Pin V5.
+ * @brief Chiếc tai ảo số V5: Nghe xem chúng ta muốn robot hát bài gì.
  *
- * Khi người dùng chọn nhạc trên ứng dụng Blynk điện thoại,
- * Blynk sẽ tự động gọi hàm này với giá trị songId tương ứng.
- *
- * Giá trị songId:
- *  1 -> Phát bài Super Mario Theme
- *  2 -> Phát bài Despacito
- *  3 -> Phát bài Jingle Bells
- *  0 -> Dừng nhạc và thoát Dance Mode
+ * Khi con bấm nút chọn bài hát trên điện thoại:
+ *  - Số 1: Robot sẽ nhảy múa theo nhạc của chú thợ sửa ống nước Super Mario!
+ *  - Số 2: Robot sẽ nhảy múa theo điệu Despacito sôi động!
+ *  - Số 3: Robot sẽ nhảy theo bài Jingle Bells mừng Giáng sinh!
+ *  - Số 0: Robot bảo "Mệt rồi, không hát nữa đâu!" và đứng yên.
  */
 BLYNK_WRITE(V5) {
-  int songId = param.asInt(); // Đọc giá trị từ Blynk
-  robotController.playSongBlynk(songId);
+  int songId = param.asInt(); // Nhận số bài hát từ điện thoại
+  robotController.playSongBlynk(songId); // Ra lệnh cho robot hát bài đó
 }
 
 /**
- * @brief Nhận lệnh chạm ảo từ Blynk Virtual Pin V6.
+ * @brief Chiếc tai ảo số V6: Nghe xem chúng ta có chạm vào robot từ xa không.
  *
- * Cho phép người dùng điều khiển robot qua điện thoại
- * như thể đang chạm trực tiếp vào cảm biến vật lý.
- *
- * Giá trị:
- *  1 -> Đang nhấn (pressed)
- *  0 -> Đã thả (released)
+ * Nhấn nút trên điện thoại cũng giống như con chạm tay trực tiếp vào robot:
+ *  - Số 1: Cảm giác giống như con đang chạm tay vào robot.
+ *  - Số 0: Con đã bỏ tay ra rồi.
  */
 BLYNK_WRITE(V6) {
-  int pressed = param.asInt();
-  robotController.setBlynkTouch(pressed == 1);
+  int pressed = param.asInt(); // Đọc xem nút được nhấn hay thả ra
+  robotController.setBlynkTouch(pressed == 1); // Báo cho robot biết để phản hồi
 }
 
 // ===================================================
-// HÀM SETUP - Chạy 1 LẦN khi khởi động
+// THỨC DẬY (Hàm setup - Chạy duy nhất 1 lần khi cắm điện)
 // ===================================================
 /**
- * @brief Arduino gọi hàm này một lần duy nhất sau khi cấp nguồn hoặc reset.
- * Khởi động toàn bộ hệ thống robot.
+ * @brief Giống như buổi sáng con thức dậy và chuẩn bị sách vở.
+ * Khi cắm điện vào, robot sẽ chạy hàm này đầu tiên để khởi động màn hình,
+ * động cơ cổ, đèn LED và còi báo.
  */
 void setup() {
-  robotController.begin();
+  robotController.begin(); // Gọi lệnh khởi động robot
 }
 
 // ===================================================
-// HÀM LOOP - Chạy LIÊN TỤC sau setup()
+// HOẠT ĐỘNG LIÊN TỤC (Hàm loop - Chạy lặp đi lặp lại mãi mãi)
 // ===================================================
 /**
- * @brief Arduino gọi hàm này lặp lại liên tục (như một vòng lặp vô hạn).
- * Mọi logic chạy trong vòng lặp đều không được dùng delay() để
- * robot luôn phản hồi nhanh (non-blocking design).
+ * @brief Đây là trái tim và bộ não đang hoạt động của robot!
+ * Hàm này chạy đi chạy lại siêu nhanh (hàng nghìn lần trong 1 giây).
+ * Robot sẽ liên tục nhìn xung quanh, đo nhiệt độ xem phòng có bị nóng không,
+ * xem con có chạm vào đầu nó không để nháy mắt hay cười vui vẻ.
  */
 void loop() {
-  robotController.update();
+  robotController.update(); // Yêu cầu robot cập nhật mọi hành động liên tục
 }

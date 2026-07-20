@@ -1,18 +1,14 @@
 /**
  * @file emote.h
- * @brief Điều khiển MÀN HÌNH OLED - hiển thị biểu cảm khuôn mặt và thông số môi trường.
+ * @brief Khuôn mặt của Robot - Màn hình OLED và đôi mắt hoạt hình biết nói!
  *
- * File này chứa class Emote chịu trách nhiệm:
- *  1. BIỂU CẢM MẶT: Dùng thư viện RoboEyes để vẽ đôi mắt hoạt hình
- *     với các trạng thái cảm xúc khác nhau (vui, mệt, tức giận...).
- *  2. MẶT X_X: Khi phát hiện cháy, vẽ thẳng lên màn hình (bypass RoboEyes).
- *  3. MÀN HÌNH THÔNG SỐ: Hiển thị nhiệt độ, độ ẩm, ánh sáng dạng số và
- *     thanh tiến trình (progress bar) khi người dùng yêu cầu.
- *  4. OVERLAY THÔNG SỐ NHỎ: Dải thông số nhỏ bên phải màn hình khi DANGER_FIRE.
- *
- * PHẦN CỨNG:
- *  - Màn hình OLED SSD1306: 128x64 pixel, giao tiếp I2C, địa chỉ 0x3C
- *  - Thư viện RoboEyes để tạo đôi mắt robot sinh động
+ * Màn hình OLED SSD1306 rộng 128 điểm ảnh và cao 64 điểm ảnh giống như một "khuôn mặt gương" của robot.
+ * Chúng ta sử dụng thư viện RoboEyes để vẽ hai bầu mắt hoạt hình cực kỳ sinh động:
+ *  - Mắt biết chớp tự động.
+ *  - Mắt biết liếc nhìn xung quanh ngẫu nhiên khi vui vẻ.
+ *  - Mắt nhắm tịt buồn ngủ khi tắt đèn.
+ *  - Mắt nháy mắt (Wink) trêu đùa khi được chạm 2 lần.
+ *  - Mặt vẽ hình X_X khi phòng quá nóng có nguy cơ cháy!
  */
 
 #ifndef EMOTE_H
@@ -20,7 +16,7 @@
 
 #include "robot_state.h"
 #include "sensors.h"
-#include <Adafruit_GFX.h>       // Thư viện đồ họa cơ bản
+#include <Adafruit_GFX.h>       // Thư viện đồ họa cơ bản (đường thẳng, hình tròn...)
 #include <Adafruit_SSD1306.h>   // Thư viện điều khiển màn hình OLED SSD1306
 #include <FluxGarage_RoboEyes.h> // Thư viện tạo đôi mắt robot hoạt hình
 
@@ -58,13 +54,12 @@ class Emote {
   bool isWinking = false;          // Đang liếc mắt không?
   unsigned long winkEndTime = 0;   // Khi nào kết thúc liếc mắt?
 
-  // Con trỏ đến đối tượng Sensors để lấy số liệu vẽ lên màn hình
+  // Con con trỏ đến đối tượng Sensors để lấy số liệu vẽ lên màn hình
   Sensors* sensors = nullptr;
 
  public:
   /**
    * @brief Hàm khởi tạo - tạo màn hình và đôi mắt.
-   * Wire là đối tượng I2C (tạo sẵn trong thư viện Wire.h).
    */
   Emote()
       : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET),
@@ -72,7 +67,6 @@ class Emote {
 
   /**
    * @brief Bật/tắt màn hình hiển thị thông số môi trường.
-   * @param show true = hiện thông số, false = hiện mặt robot
    */
   void setShowParamScreen(bool show) { showParamScreen = show; }
 
@@ -81,14 +75,13 @@ class Emote {
 
   /**
    * @brief Khởi động màn hình OLED và đôi mắt. Gọi một lần trong setup().
-   * @param sensorsPtr Con trỏ đến đối tượng Sensors (để lấy số liệu hiển thị)
    */
   void begin(Sensors* sensorsPtr) {
     sensors = sensorsPtr;
 
     // Khởi động màn hình OLED
     if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-      Serial.println(F("[Emote] LOI: Khoi dong man hinh OLED that bai!"));
+      Serial.println(F("[Màn hình] Lỗi: Khởi động màn hình OLED thất bại!"));
       return;
     }
     display.clearDisplay();
@@ -109,16 +102,6 @@ class Emote {
 
   /**
    * @brief Thay đổi biểu cảm khuôn mặt theo trạng thái robot.
-   * Mỗi trạng thái có một biểu cảm riêng:
-   *  - DANGER_FIRE  : Mặt X_X (vẽ thủ công trong update())
-   *  - DANGER_HUMID : Mệt mỏi, chảy mồ hôi
-   *  - WARNING_HOT  : Mệt mỏi (nóng)
-   *  - WARNING_COLD : Mệt mỏi + run rẩy (lạnh)
-   *  - WARNING_DARK : Tức giận, nhìn lên (thiếu sáng)
-   *  - SLEEP_MODE   : Nhắm mắt (ngủ)
-   *  - NORMAL_HAPPY : Vui vẻ, nhìn xung quanh ngẫu nhiên
-   *  - DANCE_MODE   : Vui vẻ, mắt quay tròn
-   * @param state Trạng thái mới cần hiển thị
    */
   void setExpression(RobotState state) {
     currentState = state;
@@ -126,13 +109,13 @@ class Emote {
     switch (state) {
 
       case DANGER_FIRE:
-        // Mặt X_X được vẽ trực tiếp trong update() - RoboEyes tắt
+        // Đóng kịch cứu hỏa: Sẽ vẽ mặt chữ X_X trực tiếp trong hàm update()
         eyes.setAutoblinker(false);
         eyes.setIdleMode(false);
         break;
 
       case DANGER_HUMID:
-        // Mặt mệt mỏi + chảy mồ hôi (TIRED mood + Sweat = true)
+        // Ướt sũng: mắt mệt mỏi và trán lấm tấm mồ hôi lo lắng!
         eyes.open();
         eyes.setMood(TIRED);
         eyes.setSweat(true);    // Hiệu ứng mồ hôi rơi
@@ -143,7 +126,7 @@ class Emote {
         break;
 
       case WARNING_HOT:
-        // Mặt mệt mỏi (nóng quá)
+        // Trời nóng: Mắt lờ đờ mệt mỏi
         eyes.open();
         eyes.setMood(TIRED);
         eyes.setSweat(false);
@@ -154,7 +137,7 @@ class Emote {
         break;
 
       case WARNING_COLD:
-        // Mặt mệt mỏi + run rẩy (HFlicker = rung ngang)
+        // Trời lạnh: Mắt run rẩy chao đảo
         eyes.open();
         eyes.setMood(TIRED);
         eyes.setSweat(false);
@@ -165,7 +148,7 @@ class Emote {
         break;
 
       case WARNING_DARK:
-        // Mặt tức giận + nhìn lên (đang tìm kiếm ánh sáng)
+        // Trời tối lâu: Mắt nheo lại tỏ vẻ nghi ngờ và ngước nhìn lên tìm ánh sáng
         eyes.open();
         eyes.setMood(ANGRY); // ANGRY = mắt nhíu lại
         eyes.setSweat(false);
@@ -176,7 +159,7 @@ class Emote {
         break;
 
       case SLEEP_MODE:
-        // Nhắm mắt ngủ
+        // Đi ngủ: Nhắm tịt hai mắt lại ngủ khò khò
         eyes.close();
         eyes.setSweat(false);
         eyes.setHFlicker(false);
@@ -186,7 +169,7 @@ class Emote {
         break;
 
       case NORMAL_HAPPY:
-        // Vui vẻ, tự động nhìn xung quanh ngẫu nhiên (IdleMode)
+        // Vui vẻ: Mắt cười hình cầu vồng và liếc nhìn ngẫu nhiên quanh phòng
         eyes.open();
         eyes.setMood(HAPPY);
         eyes.setSweat(false);
@@ -196,7 +179,7 @@ class Emote {
         break;
 
       case DANCE_MODE:
-        // Vui vẻ khi nhảy múa (mắt quay tròn trong update())
+        // Nhảy múa: Mắt vui vẻ mở to, không chớp mắt tự động để chuẩn bị quay tròn mắt
         eyes.open();
         eyes.setMood(HAPPY);
         eyes.setSweat(false);
@@ -209,8 +192,7 @@ class Emote {
   }
 
   /**
-   * @brief Kích hoạt hiệu ứng nháy mắt trong 1 giây.
-   * Nhắm mắt trái, mở mắt phải.
+   * @brief Nháy một bên mắt trái trong 1 giây để trêu bé (khi bé chạm 2 lần).
    */
   void triggerWink() {
     isWinking    = true;
@@ -219,60 +201,52 @@ class Emote {
     eyes.close(true, false); // Tham số: (nhắm_trái, nhắm_phải)
   }
 
-  /** @brief Kích hoạt animation cười (laugh). */
+  /** @brief Tạo mắt cười tít mắt ngộ nghĩnh */
   void triggerLaugh() { eyes.anim_laugh(); }
 
-  /** @brief Kích hoạt animation bối rối (confused). */
+  /** @brief Tạo mắt ngơ ngác phân vân */
   void triggerConfused() { eyes.anim_confused(); }
 
   /**
-   * @brief Vẽ màn hình thông số môi trường đầy đủ.
-   *
-   * Bố cục màn hình 128x64:
-   * ┌────────────────────────────────┐
-   * │         ENV STATUS             │  ← Header (y=0..12)
-   * ├──────────┬──────────┬──────────┤
-   * │   TEMP   │   HUMI   │  LIGHT   │  ← Tiêu đề cột (y=12..26)
-   * │   25 C   │  55 %    │   350    │  ← Số liệu lớn (y=26..48)
-   * │ [=====.] │ [=====.] │ [=====.] │  ← Thanh tiến trình (y=48..64)
-   * └──────────┴──────────┴──────────┘
+   * @brief Vẽ màn hình thông số thời tiết chi tiết (nhiệt độ, độ ẩm, ánh sáng).
+   * Màn hình được chia làm 3 cột tiến trình dọc ngộ nghĩnh.
    */
   void drawParamScreen() {
     display.clearDisplay();
 
-    // --- Header ---
+    // --- Vẽ tiêu đề màn hình ---
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(32, 2);
     display.print(F("ENV STATUS"));
     display.drawFastHLine(0, 12, 128, SSD1306_WHITE); // Đường kẻ ngang dưới header
 
-    // Lấy số liệu cảm biến (nếu sensors == nullptr thì dùng 0.0)
+    // Lấy thông số đo đạc từ cảm biến
     float temp  = (sensors != nullptr) ? sensors->getTemperature() : 0.0;
     float humid = (sensors != nullptr) ? sensors->getHumidity()    : 0.0;
     float light = (sensors != nullptr) ? sensors->getLightLux()    : 0.0;
 
-    // Vẽ đường kẻ dọc chia 3 cột
+    // Chia màn hình làm 3 cột bằng 2 vạch kẻ đứng
     display.drawFastVLine(42, 13, 51, SSD1306_WHITE); // Giữa cột 1 và 2
     display.drawFastVLine(85, 13, 51, SSD1306_WHITE); // Giữa cột 2 và 3
 
-    // --- Cột 1: Nhiệt độ (TEMP) ---
+    // --- CỘT 1: NHIỆT ĐỘ (TEMP) ---
     display.setCursor(9, 16);
     display.setTextSize(1);
     display.print(F("TEMP"));
 
     display.setCursor(4, 28);
-    display.setTextSize(2); // Số lớn hơn
+    display.setTextSize(2); // Số to rõ ràng
     display.print((int)round(temp));
     display.setTextSize(1);
     display.print(F("C"));
 
-    // Thanh tiến trình: 0°C = rỗng, 50°C = đầy
+    // Vẽ vạch tiến trình: Nhiệt độ từ 0°C đến 50°C ứng với thanh dài tối đa 30 điểm
     int tempBar = map(constrain((int)temp, 0, 50), 0, 50, 0, 30);
     display.drawRect(5, 48, 32, 7, SSD1306_WHITE);  // Viền thanh
-    display.fillRect(6, 49, tempBar, 5, SSD1306_WHITE); // Phần tô
+    display.fillRect(6, 49, tempBar, 5, SSD1306_WHITE); // Phần ruột trắng
 
-    // --- Cột 2: Độ ẩm (HUMI) ---
+    // --- CỘT 2: ĐỘ ẨM (HUMI) ---
     display.setTextSize(1);
     display.setCursor(52, 16);
     display.print(F("HUMI"));
@@ -283,21 +257,20 @@ class Emote {
     display.setTextSize(1);
     display.print(F("%"));
 
-    // Thanh tiến trình: 0% = rỗng, 100% = đầy
+    // Vẽ vạch tiến trình: Độ ẩm từ 0% đến 100% ứng với thanh dài tối đa 30 điểm
     int humidBar = map(constrain((int)humid, 0, 100), 0, 100, 0, 30);
     display.drawRect(48, 48, 32, 7, SSD1306_WHITE);
     display.fillRect(49, 49, humidBar, 5, SSD1306_WHITE);
 
-    // --- Cột 3: Ánh sáng (LIGHT) ---
+    // --- CỘT 3: ÁNH SÁNG (LIGHT) ---
     display.setTextSize(1);
     display.setCursor(94, 16);
     display.print(F("LIGHT"));
 
     int lightVal = (int)round(light);
     display.setCursor(90, 28);
-    // Nếu số >= 1000 (4 chữ số), dùng font nhỏ hơn để vừa cột
     if (lightVal >= 1000) {
-      display.setTextSize(1);
+      display.setTextSize(1); // Nếu sáng quá > 1000 lux thì viết chữ nhỏ lại cho đỡ chật màn hình
       display.setCursor(90, 32);
     } else {
       display.setTextSize(2);
@@ -305,23 +278,16 @@ class Emote {
     display.print(lightVal);
     display.setTextSize(1);
 
-    // Thanh tiến trình: 0 lux = rỗng, 1000 lux = đầy
+    // Vẽ vạch tiến trình: Ánh sáng từ 0 đến 1000 lux ứng với thanh dài tối đa 30 điểm
     int lightBar = map(constrain(lightVal, 0, 1000), 0, 1000, 0, 30);
     display.drawRect(91, 48, 32, 7, SSD1306_WHITE);
     display.fillRect(92, 49, lightBar, 5, SSD1306_WHITE);
 
-    display.display(); // Đẩy buffer lên màn hình thật
+    display.display(); // Đẩy toàn bộ hình vẽ lên màn hình thật
   }
 
   /**
-   * @brief Vẽ overlay thông số nhỏ bên phải màn hình (dùng khi DANGER_FIRE).
-   *
-   * Dải nhỏ bên phải (x: 97-127):
-   *  T / 45C   <- Nhiệt độ
-   *  H / 50%   <- Độ ẩm
-   *  L / 350   <- Ánh sáng
-   *
-   * @param disp Con trỏ đến đối tượng màn hình để vẽ lên
+   * @brief Vẽ một bảng thông số nhỏ gọn ở má bên phải của robot khi gặp lửa cháy (DANGER_FIRE).
    */
   void drawMetricsOverlay(Adafruit_SSD1306* disp) {
     if (sensors == nullptr) return;
@@ -344,42 +310,36 @@ class Emote {
   }
 
   /**
-   * @brief Cập nhật màn hình. Gọi liên tục trong loop().
-   *
-   * Thứ tự xử lý:
-   *  1. Kiểm tra kết thúc wink
-   *  2. Nếu đang hiện màn hình thông số -> vẽ thông số, thoát
-   *  3. Nếu DANGER_FIRE -> vẽ mặt X_X thủ công + overlay thông số
-   *  4. Ngược lại -> cập nhật RoboEyes (bao gồm mắt quay tròn nếu đang nhảy)
+   * @brief Cập nhật vẽ mắt hoặc vẽ chữ X_X báo cháy tùy trạng thái. Gọi liên tục trong loop().
    */
   void update() {
     unsigned long now = millis();
 
-    // --- Bước 1: Kết thúc wink nếu đã hết thời gian ---
+    // --- Bước 1: Kết thúc nháy mắt winking nếu đã hết thời gian 1 giây ---
     if (isWinking && now >= winkEndTime) {
       isWinking = false;
       setExpression(currentState); // Khôi phục biểu cảm bình thường
     }
 
-    // --- Bước 2: Hiển thị màn hình thông số nếu được yêu cầu ---
+    // --- Bước 2: Hiển thị màn hình thông số nếu đang ở chế độ xem thông số ---
     if (showParamScreen) {
       drawParamScreen();
       return; // Không vẽ mặt nữa
     }
 
-    // --- Bước 3: Vẽ mặt X_X khi DANGER_FIRE ---
+    // --- Bước 3: Vẽ mặt X_X khi có nguy cơ CHÁY (DANGER_FIRE) ---
     if (currentState == DANGER_FIRE) {
       display.clearDisplay();
 
-      // Mắt trái: Hình chữ X, tâm tại (28, 32)
+      // Mắt trái: Hình chữ X (tâm x=28, y=32)
       display.drawLine(16, 20, 40, 44, SSD1306_WHITE); // Đường chéo xuống phải
       display.drawLine(40, 20, 16, 44, SSD1306_WHITE); // Đường chéo xuống trái
 
-      // Mắt phải: Hình chữ X, tâm tại (68, 32)
+      // Mắt phải: Hình chữ X (tâm x=68, y=32)
       display.drawLine(56, 20, 80, 44, SSD1306_WHITE);
       display.drawLine(80, 20, 56, 44, SSD1306_WHITE);
 
-      // Miệng: Dấu gạch ngang _, tâm tại (48, 48)
+      // Miệng: Dấu gạch ngang _ ở giữa (y=48)
       display.drawLine(43, 48, 53, 48, SSD1306_WHITE);
 
       // Vẽ thêm thông số nhỏ bên phải màn hình
@@ -389,7 +349,7 @@ class Emote {
       return;
     }
 
-    // --- Bước 4: Cập nhật RoboEyes (mặt động hoạt hình) ---
+    // --- Bước 4: Quay tròn mắt khi nhảy múa (DANCE_MODE) ---
     if (currentState == DANCE_MODE && !isWinking) {
       // Khi nhảy: mắt quay tròn theo 8 hướng, đổi mỗi 200ms
       int directionIndex = (now / 200) % 8;

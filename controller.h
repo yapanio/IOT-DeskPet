@@ -1,123 +1,101 @@
 /**
  * @file controller.h
- * @brief BỘ NÃO TRUNG TÂM của robot - Kết nối tất cả các module lại với nhau.
+ * @brief BỘ NÃO NHẠC TRƯỞNG - Kết nối và điều khiển toàn bộ các bộ phận của Robot!
  *
- * Đây là file quan trọng nhất. Class Controller đóng vai trò như một "nhạc trưởng"
- * điều phối toàn bộ hoạt động của robot theo mô hình MVC (Model-View-Controller):
+ * Con hãy tưởng tượng chú Robot giống như một con búp bê thông minh có:
+ *  - Làn da (cảm biến DHT11) biết cảm nhận nóng lạnh.
+ *  - Đôi mắt (màn hình OLED) biết cười biết khóc.
+ *  - Chiếc cổ (động cơ Servo) biết quay sang trái sang phải.
+ *  - Trái tim (vòng đèn LED) biết nháy sáng nhịp thở.
+ *  - Chiếc miệng (còi Buzzer) biết hú còi cứu hỏa và hát bài nhạc.
+ *  - Bộ thu phát sóng ma thuật (WiFi + Blynk) để nói chuyện với điện thoại.
  *
- *  MODEL (Dữ liệu):
- *    - sensors.h : Dữ liệu cảm biến (nhiệt độ, độ ẩm, ánh sáng)
- *    - robot_state.h : Trạng thái hiện tại của robot
+ * File này chính là BỘ NÃO điều phối tất cả các bộ phận đó hoạt động ăn ý với nhau!
  *
- *  VIEW (Hiển thị):
- *    - emote.h   : Màn hình OLED - mặt robot và thông số
- *    - actuators.h : Đèn LED NeoPixel
- *
- *  CONTROLLER (Điều khiển):
- *    - controller.h (file này!): Đọc dữ liệu và quyết định làm gì
- *    - robot_servo.h : Điều khiển đầu robot
- *    - blynk_service.h : Giao tiếp IoT Cloud
- *
- * CHỨC NĂNG CHÍNH:
- *  1. Đọc cảm biến -> Quyết định trạng thái robot
- *  2. Xử lý cử chỉ chạm (1 chạm, 2 chạm, 3 chạm, giữ lâu)
- *  3. Quản lý chế độ nhảy múa (Dance Mode)
- *  4. Phát âm thanh cảnh báo định kỳ
- *  5. Đồng bộ số liệu lên Blynk IoT Cloud
- *
- * PIN ĐỒ KẾT NỐI:
- *  GPIO 15 -> Cảm biến chạm điện dung (Touch Sensor)
- *  GPIO 19 -> DHT11 (Nhiệt độ & Độ ẩm)
- *  GPIO 14 -> Servo SG90 (Đầu robot)
- *  GPIO  4 -> NeoPixel LED (Vòng đèn)
- *  GPIO 18 -> Buzzer (Còi)
- *  SDA/SCL -> BH1750 + OLED (tự động qua Wire.begin())
+ * PHÂN BỔ CỔNG CẮM (Pinout):
+ *  - Chân GPIO 15: Cảm biến chạm (Touch Sensor)
+ *  - Chân GPIO 19: Cảm biến nhiệt độ & độ ẩm DHT11
+ *  - Chân GPIO 14: Động cơ quay cổ Servo SG90
+ *  - Chân GPIO 4: Vòng đèn LED NeoPixel
+ *  - Chân GPIO 18: Còi Buzzer phát âm thanh
+ *  - Các chân SDA/SCL: Cắm mắt ánh sáng BH1750 và màn hình OLED SSD1306
  */
 
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include "actuators.h"      // LED NeoPixel + Buzzer
-#include "blynk_service.h"  // Kết nối Blynk IoT
-#include "emote.h"          // Màn hình OLED + Khuôn mặt
-#include "robot_servo.h"    // Điều khiển Servo
-#include "robot_state.h"    // Định nghĩa các trạng thái
-#include "sensors.h"        // Cảm biến môi trường
-#include <Arduino.h>        // Thư viện chuẩn Arduino
+#include "actuators.h"      // Thiết bị LED NeoPixel + còi Buzzer
+#include "blynk_service.h"  // Hộp thư kết nối Blynk IoT
+#include "emote.h"          // Biểu cảm mắt màn hình OLED
+#include "robot_servo.h"    // Khớp cổ quay Servo
+#include "robot_state.h"    // Bảng tâm trạng của robot
+#include "sensors.h"        // Giác quan cảm biến DHT11 + BH1750
+#include <Arduino.h>        // Thư viện cơ bản để lập trình mạch Arduino
 
 // ===================================================
-// ĐỊNH NGHĨA CÁC CHÂN GPIO
+// KHAI BÁO CỔNG CẮM TRÊN BOARD ESP32
 // ===================================================
-#define TOUCH_PIN  15  // Cảm biến chạm điện dung
-#define DHT_PIN    19  // Cảm biến nhiệt độ & độ ẩm DHT11
-#define SERVO_PIN  14  // Động cơ servo đầu robot
-#define LED_PIN     4  // Vòng đèn LED NeoPixel
-#define BUZZER_PIN 18  // Còi Buzzer
+#define TOUCH_PIN  15  // Cổng cắm cảm biến chạm
+#define DHT_PIN    19  // Cổng cắm cảm biến nhiệt độ DHT11
+#define SERVO_PIN  14  // Cổng cắm động cơ cổ Servo
+#define LED_PIN     4  // Cổng cắm dây điều khiển đèn LED
+#define BUZZER_PIN 18  // Cổng cắm dây còi Buzzer
 
 /**
  * @class Controller
- * @brief Bộ não trung tâm của robot, điều phối mọi hoạt động.
- *
- * Cách dùng (trong Project.ino):
- *   Controller robotController;
- *   robotController.begin();  // Gọi trong setup()
- *   robotController.update(); // Gọi lặp lại trong loop()
+ * @brief Bộ não điều khiển trung tâm của robot.
  */
 class Controller {
  private:
   // ===================================================
-  // CÁC MODULE CON (Sub-systems)
+  // CÁC BỘ PHẬN TRÊN CƠ THỂ ROBOT
   // ===================================================
-  Sensors      sensors;   // Module cảm biến môi trường
-  RobotServo   servo;     // Module điều khiển servo đầu
-  Actuators    actuators; // Module LED + Buzzer
-  Emote        emote;     // Module màn hình OLED + mặt robot
-  BlynkService blynk;     // Module kết nối Blynk IoT
+  Sensors      sensors;   // Giác quan đo đạc
+  RobotServo   servo;     // Khớp cổ quay
+  Actuators    actuators; // Đèn và còi phát nhạc
+  Emote        emote;     // Khuôn mặt và màn hình OLED
+  BlynkService blynk;     // Kết nối WiFi với điện thoại
 
   // ===================================================
-  // TRẠNG THÁI TỔNG THỂ CỦA ROBOT
+  // CẢM XÚC VÀ CÁC CHẾ ĐỘ CỦA ROBOT
   // ===================================================
-  RobotState currentState = NORMAL_HAPPY; // Trạng thái hiện tại (bắt đầu là vui vẻ)
-  bool testModeActive = false; // Có đang ở chế độ test (giả lập) không?
-  bool alarmMuted     = false; // Cảnh báo âm thanh có đang bị tắt không?
+  RobotState currentState = NORMAL_HAPPY; // Lúc đầu robot sẽ vui vẻ hạnh phúc
+  bool testModeActive = false; // Có đang giả vờ đóng kịch (Test Mode) không?
+  bool alarmMuted     = false; // Có đang tắt tiếng còi báo động không?
 
   // ===================================================
-  // BỘ ĐẾM THỜI GIAN CHO CẢNH BÁO
+  // HẸN GIỜ ĐỂ NHẮC NHỞ (Non-blocking Timer)
   // ===================================================
-  // Dùng để nhớ thời điểm lần cuối để so sánh (non-blocking timing)
-  unsigned long lastTimeLightChecked  = 0; // Thời điểm lux bắt đầu ở vùng cảnh báo tối
-  unsigned long lastTimeBuzzerSounded = 0; // Thời điểm phát âm cảnh báo lần cuối
+  unsigned long lastTimeLightChecked  = 0; // Thời gian bắt đầu vào phòng tối (ms)
+  unsigned long lastTimeBuzzerSounded = 0; // Lần cuối kêu bíp bíp nhắc nhở là lúc nào? (ms)
 
   // ===================================================
-  // XỬ LÝ CẢM ỨNG CHẠM (Touch Gesture Detection)
+  // NHẬN BIẾT BÉ CHẠM VÀO ROBOT (Touch Gestures)
   // ===================================================
-  // Blynk có thể gửi lệnh "chạm ảo" qua V6 (Virtual Pin 6).
-  // Robot xử lý cả chạm thật (GPIO) và chạm ảo (Blynk) giống nhau.
-  bool blynkTouchState = false; // Trạng thái chạm từ Blynk
-  bool lastTouchState  = false; // Trạng thái chạm của vòng lặp trước (để phát hiện cạnh)
+  bool blynkTouchState = false; // Bé chạm ảo từ nút bấm trên điện thoại
+  bool lastTouchState  = false; // Nhớ xem lần trước bé có chạm vào không để tính toán
 
-  unsigned long touchStartTime  = 0;     // Thời điểm bắt đầu giữ ngón tay
-  unsigned long lastTapTime     = 0;     // Thời điểm chạm nhanh gần nhất
-  int           tapCount        = 0;     // Số lần chạm nhanh đếm được
-  bool          longPressDetected = false; // Đã phát hiện giữ lâu chưa?
+  unsigned long touchStartTime  = 0;     // Bé bắt đầu đặt tay lên cảm biến từ lúc nào? (ms)
+  unsigned long lastTapTime     = 0;     // Lần thả tay gần nhất là khi nào? (ms)
+  int           tapCount        = 0;     // Đếm xem bé chạm nhanh mấy lần liên tục rồi?
+  bool          longPressDetected = false; // Đã phát hiện bé ôm giữ lâu chưa?
 
   // ===================================================
   // DANCE MODE (Chế độ nhảy múa)
   // ===================================================
-  bool       isDancing    = false;       // Đang nhảy không?
-  unsigned long danceEndTime = 0;        // Thời điểm kết thúc nhảy (ms)
-  RobotState preDanceState = NORMAL_HAPPY; // Lưu trạng thái TRƯỚC KHI nhảy để khôi phục
+  bool       isDancing    = false;       // Robot đang nhảy múa không?
+  unsigned long danceEndTime = 0;        // Nhảy đến mấy giờ thì kết thúc? (ms)
+  RobotState preDanceState = NORMAL_HAPPY; // Nhớ cảm xúc cũ để nhảy xong thì quay lại cảm xúc đó
 
   // ===================================================
-  // TRẠNG THÁI MÀN HÌNH
+  // TRẠNG THÁI HIỂN THỊ MÀN HÌNH
   // ===================================================
-  bool showParamScreen = false;              // Đang hiện màn hình thông số không?
-  bool returnToParamScreenAfterDance = false; // Sau khi nhảy xong, có quay lại thông số không?
+  bool showParamScreen = false;              // Có đang hiện màn hình thông số đo đạc không?
+  bool returnToParamScreenAfterDance = false; // Nhảy múa xong có cần hiện lại màn hình thông số không?
 
  public:
   /**
-   * @brief Hàm khởi tạo của Controller.
-   * Khai báo các module con với chân GPIO tương ứng.
+   * @brief Hàm lắp ráp các bộ phận robot vào đúng chân cắm tương ứng.
    */
   Controller()
       : sensors(DHT_PIN),
@@ -125,83 +103,65 @@ class Controller {
         actuators(LED_PIN, BUZZER_PIN) {}
 
   /**
-   * @brief Khởi động toàn bộ robot. Gọi MỘT LẦN duy nhất trong setup().
-   *
-   * Thứ tự khởi động:
-   *  1. Serial debug (để xem log trên máy tính)
-   *  2. Cấu hình chân GPIO
-   *  3. Khởi động từng module con
-   *  4. Kết nối WiFi + Blynk
-   *  5. Áp dụng trạng thái ban đầu (NORMAL_HAPPY)
+   * @brief Đánh thức toàn bộ robot dậy. Gọi một lần duy nhất trong setup().
    */
   void begin() {
-    // Khởi động cổng Serial để in thông tin debug ra máy tính
-    Serial.begin(115200);
-    while (!Serial && millis() < 3000); // Chờ Serial sẵn sàng (tối đa 3s)
+    Serial.begin(115200); // Mở đường truyền kết nối với máy tính để gửi tin nhắn debug
+    while (!Serial && millis() < 3000); // Chờ cổng máy tính mở (chờ tối đa 3 giây)
     Serial.println(F("=========================================="));
-    Serial.println(F("  IOT DeskPet - Khoi dong he thong..."));
+    Serial.println(F("  Robot DeskPet bắt đầu thức dậy và khởi động..."));
     Serial.println(F("=========================================="));
 
-    // Cấu hình chân cảm biến chạm là INPUT (đọc tín hiệu)
-    pinMode(TOUCH_PIN, INPUT);
+    pinMode(TOUCH_PIN, INPUT); // Đặt chân cảm biến chạm là cổng nhận tín hiệu
 
-    // Khởi động từng module con
-    sensors.begin();             // Cảm biến DHT11 + BH1750
-    servo.begin();               // Servo SG90
-    actuators.begin();           // LED NeoPixel + Buzzer
-    emote.begin(&sensors);       // Màn hình OLED (cần truyền sensors để hiện thông số)
-    blynk.begin();               // WiFi + Blynk (có thể mất đến 10 giây)
+    // Đánh thức tất cả các module con dậy hoạt động
+    sensors.begin();             // Đo cảm biến
+    servo.begin();               // Cổ servo
+    actuators.begin();           // Đèn và loa còi
+    emote.begin(&sensors);       // Màn hình đôi mắt
+    blynk.begin();               // Kết nối WiFi (thử bắt sóng trong 10 giây)
 
-    // Áp dụng trạng thái ban đầu cho tất cả module
-    applyStateToSubsystems();
+    applyStateToSubsystems(); // Đồng bộ cảm xúc ban đầu là NORMAL_HAPPY
 
-    // Khởi tạo bộ đếm thời gian
+    // Bắt đầu đếm giờ
     lastTimeLightChecked  = millis();
     lastTimeBuzzerSounded = millis();
 
-    Serial.println(F("Robot Controller fully initialized."));
+    Serial.println(F("Robot đã khởi động xong toàn bộ rồi!"));
   }
 
   /**
-   * @brief Vòng lặp chính của robot. Gọi LIÊN TỤC trong loop().
-   *
-   * Mỗi lần gọi update(), robot thực hiện 6 việc theo thứ tự:
-   *  1. Cập nhật số liệu cảm biến
-   *  2. Kiểm tra Dance Mode đã kết thúc chưa
-   *  3. Đánh giá trạng thái môi trường và phát âm cảnh báo
-   *  4. Xử lý cử chỉ chạm
-   *  5. Cập nhật servo, LED, màn hình
-   *  6. Gửi dữ liệu lên Blynk
+   * @brief Bộ não chạy liên tục. Gọi lặp lại mãi mãi trong loop().
    */
   void update() {
-    // BƯỚC 1: Đọc cảm biến (non-blocking - chỉ đọc khi đến lúc)
+    // 1. Cập nhật thông số thời tiết đo đạc được
     sensors.update();
 
-    // BƯỚC 2: Kiểm tra xem Dance Mode đã hết giờ hoặc bài nhạc kết thúc chưa
+    // 2. Kiểm tra xem robot nhảy múa (Dance) đã mệt và hết giờ chưa
     if (isDancing) {
-      bool songEnded      = !actuators.isSongPlaying();
-      bool danceTimeIsUp  = (millis() >= danceEndTime);
+      bool songEnded      = !actuators.isSongPlaying(); // Nhạc đã tắt chưa?
+      bool danceTimeIsUp  = (millis() >= danceEndTime); // Đã nhảy đủ 10 giây chưa?
       if (danceTimeIsUp || songEnded) {
-        Serial.println(F("[Dance Mode] Het thoi gian nhay. Tro ve binh thuong."));
+        Serial.println(F("[Nhảy múa] Hết giờ rồi! Robot dừng nhảy để nghỉ ngơi."));
         stopDanceMode();
       }
     }
 
-    // BƯỚC 3: Đánh giá môi trường và phát âm cảnh báo (chỉ khi không nhảy)
+    // 3. Nếu robot không nhảy múa: Cảm nhận môi trường và thỉnh thoảng kêu bíp bíp nhắc nhở
     if (!isDancing) {
-      evaluateEnvironmentAndUpdateState();
-      updatePeriodicAlarmBeeps();
+      evaluateEnvironmentAndUpdateState(); // Đọc cảm biến đổi cảm xúc
+      updatePeriodicAlarmBeeps();          // Tiếng bíp bíp định kỳ nhắc nhở
     }
 
-    // BƯỚC 4: Xử lý cảm ứng chạm (1 chạm, 2 chạm, 3 chạm, giữ lâu)
+    // 4. Nhận biết bé chạm tay vào người để phản hồi winking, nhảy múa
     updateTouchGesture();
 
-    // BƯỚC 5: Cập nhật phần cứng (servo/LED/OLED đều non-blocking)
+    // 5. Cập nhật hoạt động cho cổ quay, đèn LED và đôi mắt OLED
     servo.update();
     actuators.update();
     emote.update();
 
-    // BƯỚC 6: Gửi dữ liệu lên Blynk IoT Cloud
+    // 6. Gửi báo cáo tình hình thời tiết lên điện thoại của con qua Blynk
     blynk.update(
       sensors.getTemperature(),
       sensors.getHumidity(),
@@ -212,154 +172,121 @@ class Controller {
   }
 
   // ===================================================
-  // CÁC HÀM PUBLIC (Được gọi từ Project.ino qua Blynk callbacks)
+  // CÁC LỆNH GỌI TỪ ĐIỆN THOẠI (Blynk callbacks)
   // ===================================================
 
   /**
-   * @brief Xử lý lệnh phát nhạc từ Blynk Virtual Pin V5.
-   * Được gọi từ BLYNK_WRITE(V5) trong Project.ino.
-   * @param songId 1=Mario, 2=Despacito, 3=Jingle Bells, 0=Dừng
+   * @brief Nhận bài hát từ điện thoại và bắt đầu nhảy.
+   * @param songId 1=Mario, 2=Despacito, 3=Jingle Bells, 0=Dừng nhảy
    */
   void playSongBlynk(int songId) {
     if (songId >= 1 && songId <= 3) {
-      triggerDanceMode(songId); // Bắt đầu nhảy với bài nhạc tương ứng
+      triggerDanceMode(songId); // Nhảy theo bài hát đó
     } else {
-      stopDanceMode(); // Dừng nhảy
+      stopDanceMode(); // Tắt nhạc và đứng yên
     }
   }
 
   /**
-   * @brief Cập nhật trạng thái chạm ảo từ Blynk Virtual Pin V6.
-   * Được gọi từ BLYNK_WRITE(V6) trong Project.ino.
-   * @param pressed true = đang nhấn, false = đã thả
+   * @brief Nhận lệnh chạm ảo từ điện thoại.
    */
   void setBlynkTouch(bool pressed) {
     blynkTouchState = pressed;
-    Serial.print(F("[Blynk] Cham ao: "));
-    Serial.println(blynkTouchState ? F("NHAN") : F("THA"));
+    Serial.print(F("[Blynk] Bé chạm ảo: "));
+    Serial.println(blynkTouchState ? F("CHẠM VÀO") : F("THẢ TAY"));
   }
 
  private:
   // ===================================================
-  // QUẢN LÝ TRẠNG THÁI (State Management)
+  // ĐỒNG BỘ CẢM XÚC ROBOT
   // ===================================================
 
   /**
-   * @brief Áp dụng trạng thái hiện tại cho tất cả các module con.
-   * Gọi hàm này sau mỗi lần thay đổi currentState để đồng bộ
-   * màu đèn, biểu cảm mặt, và chuyển động servo.
+   * @brief Báo cho các bộ phận cổ quay, đèn led, đôi mắt biết cảm xúc hiện tại là gì để đồng bộ.
    */
   void applyStateToSubsystems() {
-    servo.setState(currentState);       // Cập nhật chuyển động đầu servo
-    actuators.setState(currentState);   // Cập nhật LED + tắt âm cũ
-    emote.setExpression(currentState);  // Cập nhật biểu cảm mặt OLED
+    servo.setState(currentState);       // Cổ quay theo hướng tương ứng
+    actuators.setState(currentState);   // Đèn đổi màu tương ứng
+    emote.setExpression(currentState);  // Mắt đổi biểu cảm tương ứng
   }
 
   /**
-   * @brief Chuyển đổi sang trạng thái mới một cách có kiểm soát.
-   *
-   * Chỉ thực sự chuyển đổi nếu trạng thái MỚI KHÁC trạng thái CŨ.
-   * In log ra Serial để dễ debug.
-   *
-   * @param newState   Trạng thái mới muốn chuyển sang
-   * @param resetAlarm true = xóa trạng thái mute (mặc định), false = giữ nguyên
+   * @brief Chuyển sang cảm xúc mới nếu thời tiết thay đổi.
    */
   void changeState(RobotState newState, bool resetAlarm = true) {
-    if (currentState == newState) return; // Không làm gì nếu không đổi
+    if (currentState == newState) return; // Nếu cảm xúc vẫn thế thì thôi giữ nguyên
 
-    Serial.print(F("[State] "));
+    Serial.print(F("[Cảm xúc đổi] Từ "));
     Serial.print(stateToString(currentState));
-    Serial.print(F(" -> "));
+    Serial.print(F(" sang -> "));
     Serial.println(stateToString(newState));
 
     currentState = newState;
-    if (resetAlarm) alarmMuted = false; // Xóa mute khi đổi trạng thái
+    if (resetAlarm) alarmMuted = false; // Đổi cảm xúc mới thì bật lại loa báo động
 
-    applyStateToSubsystems();
+    applyStateToSubsystems(); // Báo cho các bộ phận thay đổi theo cảm xúc mới
   }
 
   // ===================================================
-  // ĐÁNH GIÁ MÔI TRƯỜNG (Environment Evaluation)
+  // CẢM NHẬN THỜI TIẾT ĐỂ THAY ĐỔI CẢM XÚC (evaluate)
   // ===================================================
 
   /**
-   * @brief Đọc số liệu cảm biến và quyết định trạng thái phù hợp.
-   *
-   * ĐÂY LÀ LOGIC TRUNG TÂM CỦA ROBOT!
-   *
-   * Cây ưu tiên trạng thái (từ cao đến thấp):
-   *  1. DANGER_FIRE  : Nhiệt độ > 42°C         -> Nguy hiểm cháy nổ
-   *  2. DANGER_HUMID : Độ ẩm > 85%             -> Nguy hiểm ẩm mốc
-   *  3. WARNING_HOT  : Temp > 35°C hoặc HI > 38°C -> Cảnh báo nóng
-   *  4. WARNING_COLD : Temp < 18°C và Humid < 36%  -> Cảnh báo lạnh
-   *  5. SLEEP_MODE   : Ánh sáng < 50 lux       -> Quá tối -> ngủ
-   *  6. WARNING_DARK : Ánh sáng < 150 lux liên tục 10 phút -> Thiếu sáng
-   *  7. NORMAL_HAPPY : Tất cả đều ổn           -> Vui vẻ!
-   *
-   * Khi trạng thái thay đổi, robot cũng tự động phát bài nhạc phù hợp.
+   * @brief Đọc cảm biến và tự động chọn tâm trạng phù hợp cho robot.
    */
   void evaluateEnvironmentAndUpdateState() {
-    float temp  = sensors.getTemperature(); // Nhiệt độ (°C)
-    float humid = sensors.getHumidity();    // Độ ẩm (%)
-    float feel  = sensors.getHeatIndex();   // Cảm giác nóng (°C)
-    float lux   = sensors.getLightLux();    // Ánh sáng (lux)
+    float temp  = sensors.getTemperature(); // Lấy nhiệt độ phòng
+    float humid = sensors.getHumidity();    // Lấy độ ẩm phòng
+    float feel  = sensors.getHeatIndex();   // Cảm giác nóng thực tế
+    float lux   = sensors.getLightLux();    // Lấy ánh sáng phòng
     unsigned long now = millis();
 
-    // --- Xác định trạng thái mục tiêu ---
-    RobotState targetState = NORMAL_HAPPY; // Giả sử bình thường, rồi kiểm tra
+    RobotState targetState = NORMAL_HAPPY; // Ban đầu giả vờ là rất vui vẻ hạnh phúc
 
-    // Reset bộ đếm ánh sáng khi lux ra ngoài vùng 50-150 (vùng cảnh báo tối)
+    // Nếu phòng sáng hoặc tối om hẳn thì reset đồng hồ ánh sáng yếu
     if (lux >= 150.0 || lux < 50.0) {
       lastTimeLightChecked = now;
     }
 
-    // Kiểm tra theo thứ tự ưu tiên từ cao xuống thấp
+    // --- KIỂM TRA ĐIỀU KIỆN THEO THỨ TỰ ƯU TIÊN ---
     if (temp > 42.0) {
-      targetState = DANGER_FIRE;     // Ưu tiên cao nhất: cháy!
+      targetState = DANGER_FIRE;     // 1. Quá nóng > 42°C: Cháy rồi hoảng hốt kêu bíp bíp siren!
     } else if (humid > 85.0) {
-      targetState = DANGER_HUMID;    // Ưu tiên 2: ẩm nguy hiểm
+      targetState = DANGER_HUMID;    // 2. Ẩm ướt > 85%: Ướt sũng hỏng mạch cứu tôi với!
     } else if (temp > 35.0 || feel > 38.0) {
-      targetState = WARNING_HOT;     // Ưu tiên 3: nóng
+      targetState = WARNING_HOT;     // 3. Nóng nực > 35°C: mệt mỏi
     } else if (temp < 18.0 && humid < 36.0) {
-      targetState = WARNING_COLD;    // Ưu tiên 4: lạnh và khô
+      targetState = WARNING_COLD;    // 4. Lạnh < 18°C: run cầm cập
     } else if (lux < 50.0) {
-      targetState = SLEEP_MODE;      // Ưu tiên 5: quá tối -> ngủ
+      targetState = SLEEP_MODE;      // 5. Tối om < 50 lux: Buồn ngủ quá nhắm mắt ngủ thôi
     } else if (lux < 150.0) {
-      // Ánh sáng yếu: chỉ cảnh báo nếu đã yếu liên tục hơn 10 phút
-      if (now - lastTimeLightChecked > 600000) { // 600000ms = 10 phút
+      // 6. Ánh sáng yếu: Nếu yếu liên tục hơn 10 phút (600000ms) thì robot mới buồn bã WARNING_DARK
+      if (now - lastTimeLightChecked > 600000) {
         targetState = WARNING_DARK;
       } else {
-        // Đang trong vùng 50-150 lux nhưng chưa đủ 10 phút
-        // Giữ nguyên WARNING_DARK nếu đang ở đó, hoặc về NORMAL_HAPPY
+        // Chưa đủ 10 phút thì giữ nguyên tâm trạng cũ
         targetState = (currentState == WARNING_DARK) ? WARNING_DARK : NORMAL_HAPPY;
       }
     } else {
-      targetState = NORMAL_HAPPY; // Mọi thứ đều ổn!
+      targetState = NORMAL_HAPPY; // Môi trường hoàn hảo lý tưởng!
     }
 
-    // --- Chuyển trạng thái và cấu hình âm thanh kèm theo ---
+    // --- Thực hiện chuyển đổi cảm xúc và bật bài hát dỗ dành tương ứng ---
     if (targetState != currentState) {
       changeState(targetState, true);
 
-      // Khi vừa vào trạng thái mới, thiết lập âm thanh ban đầu
+      // Thiết lập bài hát ngay lúc vừa bước vào cảm xúc mới
       if (currentState == WARNING_HOT) {
-        // Phát Despacito ngay lập tức khi bắt đầu WARNING_HOT
-        // (rồi cứ 5 phút beep 1 lần ở updatePeriodicAlarmBeeps)
-        lastTimeBuzzerSounded = now - 300000; // Trick: đặt "5 phút trước" để beep ngay
-        actuators.playSong(2); // Bài 2: Despacito
-
+        lastTimeBuzzerSounded = now - 300000; // Trick: Đánh lừa bộ đếm thời gian để bíp nhắc nhở ngay lập tức
+        actuators.playSong(2); // Tự động hát bài Despacito sôi động giải nhiệt!
       } else if (currentState == WARNING_COLD) {
-        // Phát Jingle Bells ngay lập tức khi bắt đầu WARNING_COLD
         lastTimeBuzzerSounded = now;
-        actuators.playSong(3); // Bài 3: Jingle Bells
-
+        actuators.playSong(3); // Tự động hát bài Jingle Bells sưởi ấm mùa đông!
       } else if (currentState == WARNING_DARK) {
-        // Chuẩn bị để beep 2 lần đầu tiên (delay 1 phút)
-        lastTimeBuzzerSounded = now - 60000; // Trick: đặt "1 phút trước" để beep ngay
+        lastTimeBuzzerSounded = now - 60000; // Trick: Hẹn giờ để kêu bíp bíp đôi ngay
         actuators.stopSong();
-
       } else {
-        // Các trạng thái khác: tắt nhạc, reset bộ đếm beep
+        // Cảm xúc bình thường: tắt hát và im lặng
         lastTimeBuzzerSounded = now;
         actuators.stopSong();
       }
@@ -367,84 +294,65 @@ class Controller {
   }
 
   /**
-   * @brief Phát tiếng beep cảnh báo định kỳ (không liên tục, không chặn).
+   * @brief Kêu bíp bíp định kỳ để nhắc nhở con chăm sóc robot.
    *
-   * Chỉ hoạt động khi:
-   *  - Không bị mute (alarmMuted = false)
-   *  - Không có bài nhạc nào đang phát
-   *  - Đang ở trạng thái WARNING_HOT hoặc WARNING_DARK
-   *
-   * Lịch beep:
-   *  - WARNING_HOT  : 1 tiếng beep mỗi 5 phút (nhắc nhở không quá phiền)
-   *  - WARNING_DARK : 2 tiếng beep mỗi 1 phút (nhắc bật đèn!)
+   * Chỉ kêu bíp bíp khi:
+   *  - Loa không bị tắt (alarmMuted = false)
+   *  - Robot không đang hát nhạc
+   *  - Trời quá NÓNG hoặc quá TỐI
    */
   void updatePeriodicAlarmBeeps() {
-    // Không beep nếu: đang tắt âm HOẶC đang phát nhạc
     if (alarmMuted || actuators.isSongPlaying()) return;
 
     unsigned long now = millis();
 
     if (currentState == WARNING_HOT) {
-      // Beep 1 lần mỗi 5 phút (300,000ms)
+      // Trời nóng: Cứ 5 phút (300000ms) lại kêu "Bíp" 1 tiếng ngắn nhắc con bật quạt
       if (now - lastTimeBuzzerSounded >= 300000) {
         lastTimeBuzzerSounded = now;
-        actuators.triggerSingleBeep(1200, 150); // 1200Hz, 150ms
+        actuators.triggerSingleBeep(1200, 150); // Bíp ở tần số 1200Hz trong 150ms
       }
     } else if (currentState == WARNING_DARK) {
-      // Beep 2 lần mỗi 1 phút (60,000ms)
+      // Trời tối lâu: Cứ 1 phút (60000ms) lại kêu "Bíp Bíp" đôi nhắc con bật đèn kẻo hại mắt
       if (now - lastTimeBuzzerSounded >= 60000) {
         lastTimeBuzzerSounded = now;
-        actuators.triggerDoubleBeep(1500, 80, 80); // 1500Hz, 2 lần 80ms, khoảng nghỉ 80ms
+        actuators.triggerDoubleBeep(1500, 80, 80); // Bíp đôi tần số 1500Hz
       }
     }
   }
 
   // ===================================================
-  // DANCE MODE (Chế độ nhảy múa)
+  // KÍCH HOẠT NHẢY MÚA (Dance Mode)
   // ===================================================
 
   /**
-   * @brief Kích hoạt chế độ nhảy múa với bài nhạc chỉ định.
-   *
-   * Khi Dance Mode bật:
-   *  - Robot chuyển sang trạng thái DANCE_MODE
-   *  - LED đổi sang hiệu ứng cầu vồng xoay
-   *  - Mặt OLED hiện mắt xoay tròn
-   *  - Servo lắc đầu nhanh
-   *  - Còi phát nhạc
-   *  - Hẹn giờ tối đa 10 giây (hoặc bài nhạc kết thúc)
-   *
-   * @param songId 1=Mario, 2=Despacito, 3=Jingle Bells
+   * @brief Bắt đầu cho robot nhảy múa vui vẻ.
    */
   void triggerDanceMode(int songId = 1) {
-    Serial.print(F("[Dance Mode] Bat dau nhay voi bai so: "));
+    Serial.print(F("[Nhảy múa] Bắt đầu nhảy múa theo nhạc bài số: "));
     Serial.println(songId);
 
     isDancing     = true;
-    danceEndTime  = millis() + 10000; // Tối đa 10 giây
-    preDanceState = currentState;     // Lưu trạng thái hiện tại để phục hồi
+    danceEndTime  = millis() + 10000; // Nhảy múa tối đa trong 10 giây
+    preDanceState = currentState;     // Lưu lại cảm xúc trước đó để nhảy xong còn quay lại
 
-    changeState(DANCE_MODE, false); // false = không reset mute
-    actuators.playSong(songId);
+    changeState(DANCE_MODE, false); // Đổi mắt và đèn sang chế độ nhảy múa (không reset loa)
+    actuators.playSong(songId);     // Bắt đầu mở bài hát vui nhộn
   }
 
   /**
-   * @brief Dừng chế độ nhảy múa và khôi phục trạng thái trước đó.
-   *
-   * Sau khi dừng:
-   *  - Robot quay về trạng thái trước khi nhảy (preDanceState)
-   *  - Nếu trước khi nhảy đang hiện màn hình thông số -> khôi phục lại
+   * @brief Kết thúc nhảy múa, khôi phục lại cảm xúc cũ.
    */
   void stopDanceMode() {
-    if (!isDancing) return; // Không làm gì nếu không đang nhảy
+    if (!isDancing) return;
 
-    Serial.println(F("[Dance Mode] Dung nhay."));
+    Serial.println(F("[Nhảy múa] Hết bài rồi, dừng nhảy múa thôi."));
     isDancing = false;
-    actuators.stopSong();
+    actuators.stopSong(); // Tắt nhạc nếu chưa hết
 
-    changeState(preDanceState, false); // Khôi phục trạng thái trước khi nhảy
+    changeState(preDanceState, false); // Khôi phục lại cảm xúc trước khi nhảy
 
-    // Khôi phục màn hình thông số nếu trước đó đang hiện
+    // Nếu trước đó con đang mở màn hình thông số đo đạc thì hiện lại
     if (returnToParamScreenAfterDance) {
       showParamScreen = true;
       emote.setShowParamScreen(true);
@@ -453,70 +361,56 @@ class Controller {
   }
 
   // ===================================================
-  // XỬ LÝ CỬ CHỈ CHẠM (Touch Gesture Handling)
+  // ĐẾM SỐ LẦN BÉ CHẠM VÀO ROBOT (Touch Gesture)
   // ===================================================
 
   /**
-   * @brief Xử lý khi người dùng CHẠM 1 LẦN nhanh.
-   *
-   * Trong chế độ TEST:
-   *  - Mỗi lần chạm 1 lần sẽ chuyển sang trạng thái giả lập tiếp theo
-   *  - Thứ tự: NORMAL -> FIRE -> HUMID -> HOT -> COLD -> SLEEP -> DARK -> NORMAL
-   *  - Dùng để demo mà không cần tạo điều kiện thật
-   *
-   * Trong chế độ BÌNH THƯỜNG:
-   *  - Nếu đang có cảnh báo kêu: TẮT TIẾNG cảnh báo
-   *  - Nếu không có cảnh báo: Bật/tắt màn hình thông số
+   * @brief Bé chạm 1 lần nhanh:
+   *  - Nếu đang có chuông kêu: Tắt âm báo động (Mute).
+   *  - Nếu không kêu: Bật/Tắt màn hình xem số liệu thời tiết phòng.
+   *  - Nếu đang ở chế độ Test (giả lập): Chuyển qua các thời tiết đóng kịch khác nhau.
    */
   void handleSingleTap() {
-    // --- Chế độ Test: Quay vòng trạng thái giả lập ---
+    // --- Chế độ Test: Chuyển kịch bản giả vờ ---
     if (testModeActive) {
-      Serial.println(F("[Test Mode] Cham 1 lan -> Chuyen trang thai gia lap."));
+      Serial.println(F("[Test giả lập] Chạm 1 lần -> Đổi kịch bản giả lập thời tiết."));
 
-      // Xác định bộ giá trị cảm biến giả để gây ra trạng thái tiếp theo
       switch (currentState) {
         case NORMAL_HAPPY:
-          sensors.setMock(true, 45.0, 50.0, 350.0); // Temp 45°C -> DANGER_FIRE
-          Serial.println(F("[Test] Gia lap DANGER_FIRE (Nhiet do 45C)."));
+          sensors.setMock(true, 45.0, 50.0, 350.0); // Giả vờ nhiệt độ 45°C -> Hú báo CHÁY!
           break;
         case DANGER_FIRE:
-          sensors.setMock(true, 25.0, 90.0, 350.0); // Humid 90% -> DANGER_HUMID
-          Serial.println(F("[Test] Gia lap DANGER_HUMID (Do am 90%)."));
+          sensors.setMock(true, 25.0, 90.0, 350.0); // Giả vờ độ ẩm 90% -> Báo ẨM ƯỚT!
           break;
         case DANGER_HUMID:
-          sensors.setMock(true, 36.0, 50.0, 350.0); // Temp 36°C -> WARNING_HOT
-          Serial.println(F("[Test] Gia lap WARNING_HOT (Nhiet do 36C)."));
+          sensors.setMock(true, 36.0, 50.0, 350.0); // Giả vờ nhiệt độ 36°C -> Cảnh báo NÓNG!
           break;
         case WARNING_HOT:
-          sensors.setMock(true, 15.0, 30.0, 350.0); // Temp 15°C, Humid 30% -> WARNING_COLD
-          Serial.println(F("[Test] Gia lap WARNING_COLD (Nhiet 15C, Am 30%)."));
+          sensors.setMock(true, 15.0, 30.0, 350.0); // Giả vờ lạnh 15°C -> Cảnh báo LẠNH!
           break;
         case WARNING_COLD:
-          sensors.setMock(true, 25.0, 55.0, 20.0); // Lux 20 -> SLEEP_MODE
-          Serial.println(F("[Test] Gia lap SLEEP_MODE (Anh sang 20 lux)."));
+          sensors.setMock(true, 25.0, 55.0, 20.0);  // Giả vờ tối om 20 lux -> Đi NGỦ!
           break;
         case SLEEP_MODE:
-          sensors.setMock(true, 25.0, 55.0, 100.0); // Lux 100 + đặt timer = WARNING_DARK
-          lastTimeLightChecked = millis() - 605000;  // Giả vờ đã tối 10 phút rồi
-          Serial.println(F("[Test] Gia lap WARNING_DARK (Anh sang 100 lux, da 10 phut)."));
+          sensors.setMock(true, 25.0, 55.0, 100.0); // Giả vờ ánh sáng yếu 100 lux và tối lâu 10 phút -> WARNING_DARK!
+          lastTimeLightChecked = millis() - 605000;
           break;
         case WARNING_DARK:
         default:
-          sensors.setMock(false, 0, 0, 0); // Tắt giả lập -> về cảm biến thật
-          Serial.println(F("[Test] Tat gia lap -> Doc cam bien that."));
+          sensors.setMock(false, 0, 0, 0); // Thôi không giả vờ nữa -> Đọc cảm biến thật ngoài đời!
           break;
       }
 
-      // Reset mute để nghe lại âm thanh cảnh báo
+      // Đổi kịch bản xong thì tự bật lại loa
       alarmMuted = false;
       actuators.setMuted(false);
       return;
     }
 
-    // --- Chế độ Bình thường: Tắt tiếng hoặc bật thông số ---
-    Serial.println(F("[Touch] Cham 1 lan trong che do binh thuong."));
+    // --- Chế độ thường: Tắt tiếng còi hoặc bật màn hình thông số ---
+    Serial.println(F("[Cảm ứng] Chạm 1 lần nhanh!"));
 
-    // Kiểm tra xem có đang có cảnh báo đang phát tiếng không
+    // Xem còi có đang rú hay nhạc có đang hát báo động không?
     bool alarmIsActive = !alarmMuted && (
         currentState == DANGER_FIRE  ||
         currentState == DANGER_HUMID ||
@@ -524,52 +418,42 @@ class Controller {
     );
 
     if (alarmIsActive) {
-      // Tắt tiếng cảnh báo (Mute)
-      Serial.println(F("[Touch] Tat tieng canh bao."));
+      // Tắt tiếng kêu (Im lặng)
+      Serial.println(F("[Cảm ứng] Im lặng: Tắt tiếng còi cảnh báo."));
       alarmMuted = true;
       actuators.setMuted(true);
     } else {
-      // Bật/tắt màn hình thông số môi trường
+      // Bật hoặc tắt màn hình xem thông số
       showParamScreen = !showParamScreen;
       emote.setShowParamScreen(showParamScreen);
-      Serial.print(F("[Touch] Man hinh thong so: "));
-      Serial.println(showParamScreen ? F("BAT") : F("TAT"));
+      Serial.print(F("[Cảm ứng] Xem màn hình thông số: "));
+      Serial.println(showParamScreen ? F("BẬT") : F("TẮT"));
 
-      actuators.triggerSingleBeep(1500, 100); // Beep xác nhận
+      actuators.triggerSingleBeep(1500, 100); // Kêu "bíp" nhẹ 1 cái để báo hiệu đã bấm
     }
   }
 
   /**
-   * @brief Xử lý khi người dùng CHẠM 2 LẦN NHANH.
-   *
-   * Robot thực hiện:
-   *  - 2 tiếng beep cao
-   *  - Nháy mắt (Wink) 1 giây
-   *  - Lắc đầu nhẹ nhàng 1 giây
-   *
-   * Không hoạt động khi đang hiện màn hình thông số.
+   * @brief Bé chạm 2 lần liên tục: Nháy mắt nháy mắt trêu bé kết hợp lắc nhẹ đầu xinh!
    */
   void handleDoubleTap() {
     if (showParamScreen) {
-      Serial.println(F("[Touch] Cham 2 lan khi dang hien thi thong so - bo qua."));
+      Serial.println(F("[Cảm ứng] Đang hiện màn hình thông số, bỏ qua chạm 2 lần."));
       return;
     }
-    Serial.println(F("[Touch] Cham 2 lan -> Nham mat + Lac dau."));
-    actuators.triggerDoubleBeep(2500, 60, 60); // 2 beep tần số cao
-    emote.triggerWink();                        // Nháy mắt
-    servo.triggerGentleShake();                 // Lắc đầu
+    Serial.println(F("[Cảm ứng] Chạm 2 lần nhanh -> Nháy mắt + Lắc đầu chào bé!"));
+    actuators.triggerDoubleBeep(2500, 60, 60); // Kêu bíp bíp nhanh
+    emote.triggerWink();                        // Nháy một mắt winking
+    servo.triggerGentleShake();                 // Lắc nhẹ cổ
   }
 
   /**
-   * @brief Xử lý khi người dùng CHẠM 3 LẦN NHANH.
-   *
-   * Kích hoạt Dance Mode với bài Super Mario (bài 1) trong 5 giây.
-   * Nếu đang hiện màn hình thông số, sau khi nhảy xong sẽ quay lại màn hình thông số.
+   * @brief Bé chạm 3 lần liên tục: Kích hoạt nhảy múa Dance Mode vui nhộn trong 5 giây!
    */
   void handleTripleTap() {
-    Serial.println(F("[Touch] Cham 3 lan -> Kich hoat Dance Mode!"));
+    Serial.println(F("[Cảm ứng] Chạm 3 lần -> Bắt đầu nhảy múa nào!"));
 
-    // Ghi nhớ và ẩn màn hình thông số trước khi nhảy
+    // Ẩn tạm màn hình thông số đi để xem mặt robot nhảy múa
     if (showParamScreen) {
       returnToParamScreenAfterDance = true;
       showParamScreen               = false;
@@ -578,80 +462,57 @@ class Controller {
       returnToParamScreenAfterDance = false;
     }
 
-    triggerDanceMode(1); // Nhảy với bài Mario (ID = 1)
-    danceEndTime = millis() + 5000; // Giới hạn 5 giây khi chạm 3 lần
+    triggerDanceMode(1); // Hát bài Mario để nhảy múa
+    danceEndTime = millis() + 5000; // Nhảy nhanh 5 giây rồi thôi
   }
 
   /**
-   * @brief Phát hiện và phân tích cử chỉ chạm từ cảm biến vật lý và Blynk.
-   *
-   * Gọi liên tục trong update(). Hàm này hoạt động như một STATE MACHINE:
-   *
-   * STATE MACHINE CỬ CHỈ CHẠM:
-   *  ┌──────────────────────────────────────────────────────────────────┐
-   *  │  Phát hiện CẠN TĂNG (Bắt đầu chạm):                            │
-   *  │    -> Ghi nhớ thời điểm bắt đầu, reset longPressDetected        │
-   *  │                                                                  │
-   *  │  Trong khi đang giữ:                                            │
-   *  │    -> Nếu giữ >= 2 giây: Bật/tắt Test Mode (Long Press)         │
-   *  │                                                                  │
-   *  │  Phát hiện CẠN GIẢM (Thả tay):                                 │
-   *  │    -> Nếu chạm 50-600ms và không phải long press: tapCount++    │
-   *  │                                                                  │
-   *  │  Sau khi thả tay 400ms (không chạm thêm):                       │
-   *  │    -> tapCount == 1: handleSingleTap()                           │
-   *  │    -> tapCount == 2: handleDoubleTap()                           │
-   *  │    -> tapCount >= 3: handleTripleTap()                           │
-   *  └──────────────────────────────────────────────────────────────────┘
-   *
-   * Không xử lý chạm khi đang Dance Mode (để tránh gián đoạn).
+   * @brief Nhận biết cử chỉ gõ đầu chạm nhẹ hoặc ôm chặt giữ lâu.
    */
   void updateTouchGesture() {
-    if (isDancing) return; // Bỏ qua chạm khi đang nhảy
+    if (isDancing) return; // Nếu đang nhảy múa thì không nhận chạm để tránh bị làm phiền
 
     unsigned long now = millis();
 
-    // Đọc trạng thái chạm: cảm biến vật lý OR chạm ảo từ Blynk
+    // Đọc tín hiệu chạm (từ dây chạm vật lý hoặc nút ảo điện thoại)
     bool isTouched = (digitalRead(TOUCH_PIN) == HIGH) || blynkTouchState;
 
-    // --- Phát hiện cạnh TĂNG (vừa chạm vào) ---
+    // --- Bé bắt đầu đặt ngón tay lên chạm (Cạnh tăng) ---
     if (isTouched && !lastTouchState) {
       touchStartTime    = now;
-      longPressDetected = false; // Reset trạng thái long press
+      longPressDetected = false;
     }
 
-    // --- Phát hiện cạnh GIẢM (vừa thả tay) ---
+    // --- Bé thả tay ra không chạm nữa (Cạnh giảm) ---
     if (!isTouched && lastTouchState) {
       unsigned long pressDuration = now - touchStartTime;
 
-      // Chỉ tính là TAP nếu:
-      //  - Thời gian chạm từ 50ms đến 600ms (không quá nhanh, không quá lâu)
-      //  - Không phải là kết quả của long press
+      // Nếu bé chạm nhanh (từ 50 mili-giây đến 600 mili-giây) và không phải là đang giữ lâu
       if (!longPressDetected && pressDuration > 50 && pressDuration < 600) {
         tapCount++;
-        lastTapTime = now; // Ghi nhớ thời điểm tap gần nhất
+        lastTapTime = now; // Lưu thời gian lần chạm cuối
       }
     }
 
-    // --- Phát hiện LONG PRESS (Giữ lâu >= 2 giây) ---
+    // --- Bé ôm chặt giữ lâu liên tục 2 giây (Long Press) ---
     if (isTouched && !longPressDetected) {
       unsigned long pressDuration = now - touchStartTime;
       if (pressDuration >= 2000) { // Giữ đủ 2 giây
         longPressDetected = true;
-        tapCount          = 0; // Hủy bỏ bất kỳ tap nào đang chờ
+        tapCount          = 0; // Hủy toàn bộ đếm chạm nhanh đang chờ
 
-        // Bật/tắt chế độ Test
+        // Bật hoặc tắt chế độ Test đóng kịch giả vờ
         testModeActive = !testModeActive;
-        Serial.print(F("[Touch] Giu lau -> Che do Test: "));
-        Serial.println(testModeActive ? F("BAT") : F("TAT"));
+        Serial.print(F("[Cảm ứng] Giữ lâu -> Chế độ Test: "));
+        Serial.println(testModeActive ? F("MỞ") : F("TẮT"));
 
         if (testModeActive) {
-          // Bật Test Mode: 2 beep báo hiệu
+          // Bật Test Mode: Kêu bíp bíp đôi báo hiệu sẵn sàng
           alarmMuted = false;
           actuators.setMuted(false);
           actuators.triggerDoubleBeep(2000, 100, 100);
         } else {
-          // Tắt Test Mode: Tắt giả lập, quay về cảm biến thật, 1 beep dài
+          // Tắt Test Mode: Quay về cảm biến thật, kêu 1 bíp dài chào tạm biệt
           sensors.setMock(false, 0, 0, 0);
           alarmMuted = false;
           actuators.setMuted(false);
@@ -660,28 +521,22 @@ class Controller {
       }
     }
 
-    // --- Phân tích số lần TAP sau khoảng nghỉ 400ms ---
-    // Chờ 400ms sau lần tap cuối để chắc chắn người dùng không tap thêm
+    // --- Phân tích số lần gõ sau khi thả tay được 400ms (chắc chắn bé đã gõ xong) ---
     if (tapCount > 0 && (now - lastTapTime > 400)) {
       if      (tapCount == 1) handleSingleTap();
       else if (tapCount == 2) handleDoubleTap();
       else if (tapCount >= 3) handleTripleTap();
-      tapCount = 0; // Reset bộ đếm tap
+      tapCount = 0; // Reset đếm số lần gõ về 0
     }
 
-    // Lưu lại trạng thái chạm của lần này để dùng cho lần sau
-    lastTouchState = isTouched;
+    lastTouchState = isTouched; // Nhớ trạng thái chạm lần này
   }
 
   // ===================================================
-  // TIỆN ÍCH (Utility Functions)
+  // CÁC HÀM TIỆN ÍCH
   // ===================================================
-
   /**
-   * @brief Chuyển đổi giá trị RobotState thành chuỗi text để in log.
-   * Ví dụ: DANGER_FIRE -> "DANGER_FIRE"
-   * @param state Trạng thái cần chuyển đổi
-   * @return Chuỗi text tương ứng
+   * @brief Đổi tên trạng thái cảm xúc thành chữ viết thường để in log ra màn hình máy tính.
    */
   const char* stateToString(RobotState state) {
     switch (state) {

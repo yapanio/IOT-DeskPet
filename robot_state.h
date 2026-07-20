@@ -1,34 +1,33 @@
 /**
  * @file robot_state.h
- * @brief Định nghĩa các TRẠNG THÁI hoạt động của robot thú cưng.
+ * @brief Định nghĩa các CẢM XÚC (Trạng thái) của chú robot thú cưng.
  *
- * Robot có nhiều trạng thái khác nhau tuỳ vào điều kiện môi trường
- * hoặc tương tác của người dùng. Mỗi trạng thái sẽ ảnh hưởng đến:
- *  - Biểu cảm khuôn mặt trên màn hình OLED
- *  - Màu sắc và hiệu ứng của vòng đèn LED
- *  - Âm thanh của còi (Buzzer)
- *  - Chuyển động của đầu robot (Servo)
+ * Cũng giống như chúng ta, chú robot này cũng biết vui, buồn, sợ hãi hay buồn ngủ đấy!
+ * Tùy vào thời tiết xung quanh hoặc cách chúng ta chơi đùa, robot sẽ có các cảm xúc khác nhau:
+ *  - Màn hình OLED sẽ thay đổi hình dáng đôi mắt.
+ *  - Vòng đèn LED trên người sẽ đổi màu sắc.
+ *  - Còi Buzzer sẽ kêu bíp bíp báo động hoặc hát nhạc vui tươi.
+ *  - Cổ của robot (động cơ servo) sẽ quay đầu linh hoạt.
  */
 
-// Tránh khai báo file nhiều lần (include guard)
 #ifndef ROBOT_STATE_H
 #define ROBOT_STATE_H
 
 /**
- * @brief Danh sách tất cả các trạng thái của robot.
+ * @brief Bảng tâm trạng của robot.
  *
- * Enum giúp chúng ta dùng tên dễ đọc thay vì số thứ tự (0, 1, 2...).
- * Ví dụ: thay vì viết "trạng thái 3" ta viết DANGER_FIRE cho dễ hiểu.
+ * Enum là cách chúng ta đặt tên cho các cảm xúc để máy tính dễ hiểu.
+ * Thay vì dùng các con số khô khan (0, 1, 2...), ta dùng những tên gọi đáng yêu dưới đây:
  */
 enum RobotState {
-  DANGER_FIRE,   // Nguy hiểm: Nhiệt độ quá cao (>42°C) -> Báo động cháy!
-  DANGER_HUMID,  // Nguy hiểm: Độ ẩm quá cao (>85%) -> Báo động ẩm ướt!
-  WARNING_HOT,   // Cảnh báo: Nóng (>35°C) -> Khó chịu, cần chú ý
-  WARNING_COLD,  // Cảnh báo: Lạnh (<18°C và ẩm <36%) -> Run rẩy
-  WARNING_DARK,  // Cảnh báo: Thiếu sáng liên tục hơn 10 phút
-  SLEEP_MODE,    // Chế độ ngủ: Ánh sáng quá tối (<50 lux) -> Ngủ ngon!
-  NORMAL_HAPPY,  // Bình thường: Môi trường lý tưởng -> Vui vẻ, hạnh phúc
-  DANCE_MODE     // Nhảy múa: Được kích hoạt bởi người dùng
+  DANGER_FIRE,   // 1. Quá nóng (>42°C): Robot hoảng hốt kêu "Cháy! Cháy!" (Đèn chớp đỏ, còi hú siren).
+  DANGER_HUMID,  // 2. Ướt sũng (>85% độ ẩm): Robot sợ bị ẩm ướt hỏng mạch (Đèn đỏ đặc, còi kêu liên tục).
+  WARNING_HOT,   // 3. Trời nóng nực (>35°C): Robot mệt mỏi khó chịu (Đèn màu cam, tự hát Despacito).
+  WARNING_COLD,  // 4. Trời lạnh giá (<18°C): Robot run bần bật (Đèn màu xanh cyan nhạt, tự hát Jingle Bells).
+  WARNING_DARK,  // 5. Phòng tối om quá 10 phút: Robot thấy cô đơn (Đèn nháy vàng, kêu bíp đôi định kỳ).
+  SLEEP_MODE,    // 6. Đi ngủ: Khi trời tối hẳn (<50 lux), robot sẽ nhắm mắt ngủ khò khò (Đèn tím mờ nhè nhẹ).
+  NORMAL_HAPPY,  // 7. Vui vẻ hạnh phúc: Thời tiết mát mẻ lý tưởng, robot nhìn quanh và chớp mắt cười yêu đời.
+  DANCE_MODE     // 8. Nhảy múa: Khi được con chạm tay 3 lần hoặc bấm nút trên điện thoại, robot sẽ xoay đầu nhảy múa cực vui!
 };
 
 #endif  // ROBOT_STATE_H

@@ -1,112 +1,96 @@
 /**
  * @file sensors.h
- * @brief Quản lý đọc dữ liệu từ các CẢM BIẾN môi trường.
+ * @brief Giác quan của Robot - Giúp Robot cảm nhận môi trường xung quanh!
  *
- * File này chứa class Sensors chịu trách nhiệm:
- *  - Đọc nhiệt độ và độ ẩm từ cảm biến DHT11
- *  - Đọc cường độ ánh sáng từ cảm biến BH1750
- *  - Tính toán "chỉ số cảm giác nóng" (Heat Index)
- *  - Hỗ trợ chế độ giả lập (Mock Mode) để test mà không cần phần cứng thật
+ * Để biết được trời nóng hay lạnh, sáng hay tối, chú robot của chúng ta cần có "giác quan":
+ *  - Cảm biến nhiệt độ & độ ẩm DHT11 giống như làn da của robot.
+ *  - Cảm biến ánh sáng BH1750 giống như đôi mắt của robot nhìn xem phòng có sáng không.
  *
- * PHẦN CỨNG SỬ DỤNG:
- *  - DHT11: Cảm biến nhiệt độ & độ ẩm (giao tiếp 1-Wire)
- *  - BH1750: Cảm biến ánh sáng (giao tiếp I2C - địa chỉ 0x23)
+ * Tất cả số liệu đo được sẽ được gửi về "bộ não" điều khiển.
  */
 
 #ifndef SENSORS_H
 #define SENSORS_H
 
 #include <BH1750.h>  // Thư viện cảm biến ánh sáng BH1750
-#include <DHT.h>     // Thư viện cảm biến DHT11
-#include <Wire.h>    // Thư viện giao tiếp I2C (dùng cho BH1750 và OLED)
+#include <DHT.h>     // Thư viện cảm biến nhiệt độ DHT11
+#include <Wire.h>    // Dùng đường truyền I2C để nói chuyện với BH1750 và màn hình OLED
 
-// Loại cảm biến DHT đang dùng (DHT11 hoặc DHT22)
+// Loại cảm biến DHT là DHT11 (như một mẫu da cơ bản)
 #define DHTTYPE DHT11
 
 /**
  * @class Sensors
- * @brief Đóng gói tất cả logic đọc cảm biến vào một class gọn gàng.
- *
- * Cách dùng:
- *   Sensors sensors(19);  // Khai báo với chân GPIO của DHT11
- *   sensors.begin();      // Khởi động cảm biến
- *   sensors.update();     // Gọi liên tục trong loop() để cập nhật số liệu
- *   float t = sensors.getTemperature();  // Lấy nhiệt độ
+ * @brief Hộp chứa tất cả các giác quan của Robot.
  */
 class Sensors {
  private:
   // ===================================================
-  // PHẦN CỨNG
+  // CÁC THIẾT BỊ PHẦN CỨNG (Giác quan vật lý)
   // ===================================================
-  DHT dht;          // Đối tượng cảm biến DHT11
-  BH1750 lightMeter; // Đối tượng cảm biến ánh sáng BH1750
+  DHT dht;           // Cảm biến da DHT11 để đo nóng lạnh
+  BH1750 lightMeter; // Cảm biến mắt BH1750 để đo ánh sáng
 
   // ===================================================
-  // DỮ LIỆU CẢM BIẾN (được cập nhật định kỳ)
+  // THÔNG TIN ĐO ĐƯỢC (Được cập nhật thường xuyên)
   // ===================================================
   float temperature = 0.0;  // Nhiệt độ hiện tại (°C)
   float humidity    = 0.0;  // Độ ẩm hiện tại (%)
-  float heatIndex   = 0.0;  // Chỉ số cảm giác nóng - "feels like" (°C)
-  float lightLux    = 0.0;  // Cường độ ánh sáng (lux)
+  float heatIndex   = 0.0;  // Cảm giác nóng thực tế (°C)
+  float lightLux    = 0.0;  // Độ sáng của phòng (đơn vị lux)
 
   // ===================================================
-  // BỘ ĐẾM THỜI GIAN (giúp đọc cảm biến không đồng bộ)
+  // ĐỒNG HỒ ĐẾM THỜI GIAN (Hẹn giờ không làm phiền robot)
   // ===================================================
-  // "Không đồng bộ" (non-blocking) nghĩa là: thay vì dừng lại chờ
-  // cảm biến trả kết quả, ta chỉ đọc khi đã đến lúc, rồi tiếp tục
-  // làm việc khác ngay. Điều này giúp robot luôn phản hồi nhanh.
-  unsigned long lastDhtRead   = 0;  // Thời điểm đọc DHT11 lần cuối (ms)
-  unsigned long lastLightRead = 0;  // Thời điểm đọc BH1750 lần cuối (ms)
+  // Robot không dùng lệnh delay() (ngủ đông), mà dùng cách "nhìn đồng hồ".
+  // Mỗi khi muốn đọc thông số, robot sẽ xem đã đến giờ hẹn chưa.
+  // Nhờ thế robot vẫn lắc đầu và hát nhạc mượt mà.
+  unsigned long lastDhtRead   = 0;  // Lần cuối cùng đo nhiệt độ là lúc nào? (ms)
+  unsigned long lastLightRead = 0;  // Lần cuối cùng đo ánh sáng là lúc nào? (ms)
 
-  // Khoảng cách thời gian giữa các lần đọc
-  const unsigned long DHT_READ_INTERVAL   = 2000; // Đọc DHT11 mỗi 2 giây
-  const unsigned long LIGHT_READ_INTERVAL = 1000; // Đọc BH1750 mỗi 1 giây
+  // Khoảng thời gian hẹn trước giữa mỗi lần đo
+  const unsigned long DHT_READ_INTERVAL   = 2000; // Cứ mỗi 2 giây đo nhiệt độ 1 lần
+  const unsigned long LIGHT_READ_INTERVAL = 1000; // Cứ mỗi 1 giây đo ánh sáng 1 lần
 
   // ===================================================
-  // CHẾ ĐỘ GIẢ LẬP (Mock Mode) - Dùng để TEST
+  // CHẾ ĐỘ ĐÓNG KỊCH (Giả lập - Mock Mode để Test)
   // ===================================================
-  // Khi mockMode = true, thay vì đọc cảm biến thật,
-  // chương trình sẽ dùng các giá trị giả lập bên dưới.
-  // Rất hữu ích để kiểm tra các trạng thái cảnh báo mà
-  // không cần tạo ra điều kiện môi trường thật (như đốt lửa!)
-  bool  mockMode  = false; // Có đang ở chế độ giả lập không?
-  float mockTemp  = 25.0;  // Nhiệt độ giả lập (°C)
-  float mockHumid = 55.0;  // Độ ẩm giả lập (%)
-  float mockLux   = 350.0; // Ánh sáng giả lập (lux)
+  // Khi bật chế độ này lên (mockMode = true), robot sẽ "giả vờ" như trời
+  // đang cực kỳ nóng hoặc lạnh để chúng ta kiểm tra xem robot có biết báo động không.
+  // Nhờ thế chúng ta không cần dùng lửa thật hay nước đá thật để thử robot!
+  bool  mockMode  = false; // Có đang giả vờ hay không?
+  float mockTemp  = 25.0;  // Nhiệt độ giả vờ (°C)
+  float mockHumid = 55.0;  // Độ ẩm giả vờ (%)
+  float mockLux   = 350.0; // Ánh sáng giả vờ (lux)
 
  public:
   /**
-   * @brief Hàm khởi tạo - chỉ nhận chân GPIO của DHT11.
-   * @param dhtPin Số chân GPIO kết nối với dây DATA của DHT11
+   * @brief Hàm chuẩn bị chân cắm cho cảm biến nhiệt độ.
+   * @param dhtPin Số cổng cắm dây dữ liệu của DHT11 trên ESP32
    */
   Sensors(int dhtPin) : dht(dhtPin, DHTTYPE) {}
 
   /**
-   * @brief Khởi động tất cả cảm biến. Gọi một lần trong setup().
+   * @brief Khởi động các giác quan của robot.
    */
   void begin() {
-    // Khởi động DHT11
+    // Đánh thức cảm biến nhiệt độ dậy
     dht.begin();
 
-    // Khởi động I2C và BH1750
+    // Bắt đầu đường nói chuyện I2C và khởi động cảm biến ánh sáng
     Wire.begin();
     if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23)) {
-      Serial.println(F("[Sensors] BH1750 (Cam bien anh sang) khoi dong OK."));
+      Serial.println(F("[Cảm biến] Mắt đo ánh sáng BH1750 đã sẵn sàng!"));
     } else {
-      Serial.println(F("[Sensors] LOI: BH1750 khoi dong that bai!"));
+      Serial.println(F("[Cảm biến] Ối! Không tìm thấy mắt đo ánh sáng BH1750 rồi!"));
     }
   }
 
   /**
-   * @brief Bật/tắt chế độ giả lập và thiết lập giá trị giả.
+   * @brief Ra lệnh cho robot chuyển sang chế độ "đóng kịch" (giả lập).
    *
-   * Ví dụ giả lập cháy: sensors.setMock(true, 45.0, 50.0, 350.0);
-   * Tắt giả lập:        sensors.setMock(false, 0, 0, 0);
-   *
-   * @param enable Bật (true) hay tắt (false) chế độ giả lập
-   * @param temp   Nhiệt độ giả (°C)
-   * @param humid  Độ ẩm giả (%)
-   * @param lux    Ánh sáng giả (lux)
+   * Ví dụ đóng kịch có cháy: setMock(true, 45.0, 50.0, 350.0);
+   * Thoát đóng kịch:        setMock(false, 0, 0, 0);
    */
   void setMock(bool enable, float temp, float humid, float lux) {
     mockMode  = enable;
@@ -115,67 +99,63 @@ class Sensors {
     mockLux   = lux;
   }
 
-  /** @brief Kiểm tra xem chế độ giả lập có đang bật không. */
+  /** @brief Hỏi xem robot có đang đóng kịch giả lập hay không. */
   bool isMockEnabled() const { return mockMode; }
 
   /**
-   * @brief Cập nhật số liệu cảm biến. Gọi liên tục trong loop().
-   *
-   * Hàm này sẽ đọc lại cảm biến chỉ khi đã đến lúc (theo interval).
-   * Nếu đang ở chế độ mock, sẽ dùng giá trị giả thay vì đọc thật.
+   * @brief Cập nhật thông số từ môi trường. Hàm này chạy liên tục trong loop().
    */
   void update() {
-    // --- Chế độ giả lập: dùng giá trị mock, bỏ qua đọc phần cứng ---
+    // --- Nếu đang đóng kịch: Nhận luôn thông số giả vờ, không đo thật nữa ---
     if (mockMode) {
       temperature = mockTemp;
       humidity    = mockHumid;
-      // Tính heat index từ nhiệt độ và độ ẩm giả lập
       heatIndex   = dht.computeHeatIndex(temperature, humidity, false);
       lightLux    = mockLux;
       return;
     }
 
-    // --- Chế độ thật: đọc từ phần cứng ---
-    unsigned long now = millis(); // Lấy thời gian hiện tại (ms kể từ khi bật)
+    // --- Nếu đang đo thật: Nhìn đồng hồ xem đã đến lúc đọc cảm biến chưa ---
+    unsigned long now = millis(); // Thời gian tính bằng mili-giây kể từ khi cắm điện
 
-    // Đọc DHT11 nếu đã đến thời điểm (mỗi 2 giây)
+    // Cứ sau 2 giây đo da nhiệt độ một lần
     if (now - lastDhtRead >= DHT_READ_INTERVAL || lastDhtRead == 0) {
-      float tempRead  = dht.readTemperature(); // Đọc nhiệt độ
-      float humidRead = dht.readHumidity();    // Đọc độ ẩm
+      float tempRead  = dht.readTemperature(); // Đọc nhiệt độ thật
+      float humidRead = dht.readHumidity();    // Đọc độ ẩm thật
 
-      // Kiểm tra dữ liệu có hợp lệ không (isnan = "is not a number")
+      // Kiểm tra xem số liệu đọc về có bị lỗi không (isnan = không phải số hợp lệ)
       if (!isnan(tempRead) && !isnan(humidRead)) {
         temperature = tempRead;
         humidity    = humidRead;
         heatIndex   = dht.computeHeatIndex(temperature, humidity, false);
       } else {
-        Serial.println(F("[Sensors] LOI: Doc DHT11 that bai!"));
+        Serial.println(F("[Cảm biến] Cảnh báo: Lỗi không đọc được cảm biến DHT11 rồi!"));
       }
-      lastDhtRead = now; // Lưu lại thời điểm đọc lần này
+      lastDhtRead = now; // Lưu lại thời gian vừa đọc xong
     }
 
-    // Đọc BH1750 nếu đã đến thời điểm (mỗi 1 giây)
+    // Cứ sau 1 giây đo mắt ánh sáng một lần
     if (now - lastLightRead >= LIGHT_READ_INTERVAL || lastLightRead == 0) {
-      float luxRead = lightMeter.readLightLevel(); // Đọc ánh sáng
+      float luxRead = lightMeter.readLightLevel(); // Đọc độ sáng thật
       if (luxRead >= 0) {
         lightLux = luxRead;
       } else {
-        Serial.println(F("[Sensors] LOI: Doc BH1750 that bai!"));
+        Serial.println(F("[Cảm biến] Cảnh báo: Lỗi không đọc được mắt ánh sáng BH1750!"));
       }
-      lastLightRead = now;
+      lastLightRead = now; // Lưu lại thời gian vừa đọc xong
     }
   }
 
   // ===================================================
-  // CÁC HÀM LẤY DỮ LIỆU (Getters)
+  // CÁC NÚT BẤM LẤY SỐ LIỆU ĐỂ HỎI THÔNG TIN (Getters)
   // ===================================================
-  /** @return Nhiệt độ hiện tại (°C) */
+  /** @return Nhiệt độ phòng hiện tại (°C) */
   float getTemperature() const { return temperature; }
 
-  /** @return Độ ẩm hiện tại (%) */
+  /** @return Độ ẩm phòng hiện tại (%) */
   float getHumidity() const { return humidity; }
 
-  /** @return Chỉ số cảm giác nóng - Heat Index (°C) */
+  /** @return Cảm giác nóng thực tế (°C) */
   float getHeatIndex() const { return heatIndex; }
 
   /** @return Cường độ ánh sáng (lux) */
