@@ -150,7 +150,6 @@ class Controller {
     // 3. Nếu robot không nhảy múa: Cảm nhận môi trường và thỉnh thoảng kêu bíp bíp nhắc nhở
     if (!isDancing) {
       evaluateEnvironmentAndUpdateState(); // Đọc cảm biến đổi cảm xúc
-      updatePeriodicAlarmBeeps();          // Tiếng bíp bíp định kỳ nhắc nhở
     }
 
     // 4. Nhận biết bé chạm tay vào người để phản hồi winking, nhảy múa
@@ -289,34 +288,6 @@ class Controller {
         // Cảm xúc bình thường: tắt hát và im lặng
         lastTimeBuzzerSounded = now;
         actuators.stopSong();
-      }
-    }
-  }
-
-  /**
-   * @brief Kêu bíp bíp định kỳ để nhắc nhở con chăm sóc robot.
-   *
-   * Chỉ kêu bíp bíp khi:
-   *  - Loa không bị tắt (alarmMuted = false)
-   *  - Robot không đang hát nhạc
-   *  - Trời quá NÓNG hoặc quá TỐI
-   */
-  void updatePeriodicAlarmBeeps() {
-    if (alarmMuted || actuators.isSongPlaying()) return;
-
-    unsigned long now = millis();
-
-    if (currentState == WARNING_HOT) {
-      // Trời nóng: Cứ 5 phút (300000ms) lại kêu "Bíp" 1 tiếng ngắn nhắc con bật quạt
-      if (now - lastTimeBuzzerSounded >= 300000) {
-        lastTimeBuzzerSounded = now;
-        actuators.triggerSingleBeep(1200, 150); // Bíp ở tần số 1200Hz trong 150ms
-      }
-    } else if (currentState == WARNING_DARK) {
-      // Trời tối lâu: Cứ 1 phút (60000ms) lại kêu "Bíp Bíp" đôi nhắc con bật đèn kẻo hại mắt
-      if (now - lastTimeBuzzerSounded >= 60000) {
-        lastTimeBuzzerSounded = now;
-        actuators.triggerDoubleBeep(1500, 80, 80); // Bíp đôi tần số 1500Hz
       }
     }
   }

@@ -65,6 +65,131 @@ Cảm biến chạm được tích hợp hệ thống nhận diện cử chỉ t
 
 ---
 
+## 📊 Sơ Đồ Thuật Toán & Luồng Xử Lý (System Flowcharts)
+
+File sơ đồ thiết kế chi tiết (Draw.io): [`flowchart.drawio`](flowchart.drawio)
+
+### 1. Sơ đồ Tổng quan Bộ não Robot — Hàm `update()`
+```mermaid
+flowchart TD
+    A([Bắt đầu vòng lặp loop]) --> B[1. Đọc dữ liệu cảm biến: sensors.update]
+    B --> C{Đang nhảy múa isDancing?}
+    
+    C -- Có --> D{Hết 10s HOẶC Nhạc đã tắt?}
+    D -- Có --> E[Dừng nhảy múa: stopDanceMode & Khôi phục tâm trạng cũ] --> M1(( ))
+    D -- Không --> M1
+    
+    C -- Không --> F[2. Đánh giá Môi trường & Đổi tâm trạng: evaluateEnvironmentAndUpdateState] --> M1
+    
+    M1 --> G[4. Nhận biết & Xử lý Cảm ứng: updateTouchGesture]
+    G --> H[5. Cập nhật Động cơ Servo, Đèn LED & Đôi mắt OLED]
+    H --> I[6. Gửi dữ liệu cảm biến & tâm trạng lên App Blynk IoT]
+    I --> J([Kết thúc 1 chu kỳ - Lặp lại])
+```
+
+---
+
+### 2. Phản ứng Môi trường — Hàm `evaluateEnvironmentAndUpdateState()`
+```mermaid
+flowchart TD
+    Start([Bắt đầu]) --> Read[Lấy thông số: Nhiệt độ, Độ ẩm, Cảm giác nhiệt, Ánh sáng Lux]
+    
+    Read --> D1{Nhiệt độ > 42°C?}
+    D1 -- Có --> S1[targetState = DANGER_FIRE<br/>Cháy khẩn cấp] --> TargetJoin(( ))
+    
+    D1 -- Không --> D2{Độ ẩm > 85%?}
+    D2 -- Có --> S2[targetState = DANGER_HUMID<br/>Ẩm ướt hư mạch] --> TargetJoin
+    
+    D2 -- Không --> D3{NĐ > 35°C HOẶC Cảm giác > 38°C?}
+    D3 -- Có --> S3[targetState = WARNING_HOT<br/>Nóng nực mệt mỏi] --> TargetJoin
+    
+    D3 -- Không --> D4{NĐ < 18°C VÀ ĐẨ < 36%?}
+    D4 -- Có --> S4[targetState = WARNING_COLD<br/>Lạnh run người] --> TargetJoin
+    
+    D4 -- Không --> D5{Ánh sáng < 50 Lux?}
+    D5 -- Có --> S5[targetState = SLEEP_MODE<br/>Nhắm mắt đi ngủ] --> TargetJoin
+    
+    D5 -- Không --> D6{Ánh sáng < 150 Lux<br/>VÀ Tối liên tục > 10 phút?}
+    D6 -- Có --> S6[targetState = WARNING_DARK<br/>Tối lâu hại mắt] --> TargetJoin
+    
+    D6 -- Không --> SDef[targetState = NORMAL_HAPPY<br/>Môi trường lý tưởng, vui vẻ] --> TargetJoin
+    
+    TargetJoin --> DChange{targetState != currentState?<br/>Tâm trạng mục tiêu khác hiện tại?}
+    DChange -- Có --> Apply[Cập nhật Tâm trạng mới: changeState<br/>• Đổi biểu cảm Mắt OLED, Đèn LED & Cổ Servo<br/>• Bật nhạc dỗ dành Despacito / Jingle Bells] --> EndJoin(( ))
+    DChange -- Không --> EndJoin
+    
+    EndJoin --> Finish([Kết thúc])
+```
+
+---
+
+### 3. Nhận diện & Xử lý Cảm ứng — Hàm `updateTouchGesture()`
+```mermaid
+flowchart TD
+    Start([Bắt đầu]) --> D1{Đang nhảy múa?}
+    D1 -- Có --> MEnd(( ))
+    
+    D1 -- Không --> ReadTouch[Đọc trạng thái cảm ứng: isTouched]
+    ReadTouch --> D2{Giữ lâu ≥ 2 giây?}
+    
+    D2 -- Có --> HoldP[Bật / Tắt chế độ Test<br/>tapCount = 0<br/>Phát tiếng bíp xác nhận] --> MEnd
+    
+    D2 -- Không --> D3{Chạm hợp lệ?<br/>nhả ra, 50ms – 600ms}
+    D3 -- Có --> ValidP[tapCount++<br/>Ghi nhận thời gian chạm cuối] --> M1(( ))
+    D3 -- Không --> M1
+    
+    M1 --> D4{tapCount > 0 VÀ đã qua 400ms?}
+    D4 -- Không --> MEnd
+    
+    D4 -- Có --> D5{tapCount == 1?}
+    D5 -- Có --> Tap1[Xử lý Chạm 1 lần: handleSingleTap<br/>tapCount = 0] --> MEnd
+    
+    D5 -- Không --> D6{tapCount == 2?}
+    D6 -- Có --> Tap2[Xử lý Chạm 2 lần: handleDoubleTap<br/>tapCount = 0] --> MEnd
+    D6 -- Không --> Tap3[Xử lý Chạm 3 lần: handleTripleTap<br/>tapCount = 0] --> MEnd
+    
+    MEnd --> Finish([Kết thúc])
+```
+
+---
+
+### 4. Xử lý Chạm 1 lần — Hàm `handleSingleTap()`
+```mermaid
+flowchart TD
+    Start([Bắt đầu]) --> D1{Đang ở chế độ Test?}
+    
+    D1 -- Có --> TestP[Chuyển sang kịch bản giả lập tiếp theo<br/>setMock → trạng thái thời tiết kế tiếp<br/>alarmMuted = false] --> MEnd(( ))
+    
+    D1 -- Không --> D2{Đang có báo động?<br/>!alarmMuted VÀ đang ở trạng thái NGUY HIỂM hoặc đang hát}
+    D2 -- Có --> MuteP[Tắt tiếng báo động<br/>alarmMuted = true] --> MEnd
+    
+    D2 -- Không --> ToggleP[Bật / Tắt màn hình thông số môi trường<br/>Phát tiếng bíp xác nhận] --> MEnd
+    
+    MEnd --> Finish([Kết thúc])
+```
+
+---
+
+### 5. Xử lý Chạm 2 lần & 3 lần — Hàm `handleDoubleTap()` & `handleTripleTap()`
+
+#### 🔹 `handleDoubleTap()` (Chạm 2 lần - Nháy mắt & Lắc đầu)
+```mermaid
+flowchart TD
+    Start([Bắt đầu]) --> D1{Đang hiện màn hình thông số?}
+    D1 -- Có --> Ignore[Bỏ qua] --> MEnd(( ))
+    D1 -- Không --> Action[Nháy mắt Wink<br/>Lắc đầu nhẹ nhàng<br/>Phát bíp đôi 2500 Hz] --> MEnd
+    MEnd --> Finish([Kết thúc])
+```
+
+#### 🔹 `handleTripleTap()` (Chạm 3 lần - Kích hoạt Nhảy múa Dance Mode)
+```mermaid
+flowchart TD
+    Start([Bắt đầu]) --> D1{Đang hiện màn hình thông số?}
+    D1 -- Có --> HideP[Ẩn màn hình thông số<br/>Lưu cờ: quay lại sau khi nhảy xong] --> M1(( ))
+    D1 -- Không --> ClearP[Xóa cờ: không cần quay lại màn hình thông số] --> M1
+    
+    M1 --> DanceP[Kích hoạt nhảy múa Dance Mode<br/>Phát bài nhạc Super Mario<br/>Đặt hẹn giờ nhảy = 5 giây] --> Finish([Kết thúc])
+```
 
 ---
 
@@ -103,5 +228,5 @@ Sau đó biên dịch dự án và nạp code xuống board ESP32 của bạn!
 | :--- | :--- | :--- |
 | **Nguyễn Huy Nhật** | HE204465 | Thành viên nhóm |
 | **Lưu Chí Kiên** | HE204365 | Thành viên nhóm |
-| **Phạm Công Hùng** | HEXXXXXX | Thành viên nhóm |
+| **Phạm Công Hùng** | HE204376 | Thành viên nhóm |
 

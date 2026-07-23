@@ -81,31 +81,16 @@ class Actuators {
   // CÁC HÀM TẠO SÓNG ÂM THANH CHO CÒI (Nội bộ - Private)
   // ===================================================
 
-#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
-  // --- Dành cho mạch ESP32 đời mới ---
   void playTone(int frequency) {
     if (frequency <= 0) { stopTone(); return; }
-    ledcAttach(buzzerPin, frequency, 8);  // Cắm loa ảo vào chân còi
-    ledcWrite(buzzerPin, BUZZER_VOLUME);  // Bật nhạc kêu nhè nhẹ
+    ledcAttach(buzzerPin, frequency, 8);  // Cắm loa ảo vào chân còi // 8 ở đây là 8 bit
+    ledcWrite(buzzerPin, BUZZER_VOLUME);  // Bật nhạc kêu nhè nhẹ // đây
   }
   void stopTone() {
     ledcWrite(buzzerPin, 0);   // Tắt nhạc (âm lượng bằng 0)
     ledcDetach(buzzerPin);     // Rút loa ảo ra
   }
-#else
-  // --- Dành cho mạch ESP32 đời cũ ---
-  void playTone(int frequency) {
-    if (frequency <= 0) { stopTone(); return; }
-    // Thay vì dùng kênh 1 dễ bị xung đột với động cơ cổ Servo làm cổ bị giật giật,
-    // ta chuyển sang dùng kênh 4 để cổ robot quay cực kỳ mượt mà nhé!
-    ledcSetup(4, frequency, 8);    // Cài đặt kênh phát nhạc số 4
-    ledcAttachPin(buzzerPin, 4);   // Cắm còi vào kênh 4
-    ledcWrite(4, BUZZER_VOLUME);   // Cho còi kêu nhè nhẹ
-  }
-  void stopTone() {
-    ledcWrite(4, 0); // Tắt âm trên kênh 4
-  }
-#endif
+  
 
  public:
   /**
@@ -119,6 +104,7 @@ class Actuators {
    */
   void begin() {
     strip.begin(); // Đánh thức dải đèn LED
+    strip.setBrightness(40); // Giới hạn độ sáng ở mức ~15% để tránh sụt áp gây đơ động cơ Servo
     strip.show();  // Tắt hết đèn cho tối để bắt đầu chơi
 
     pinMode(buzzerPin, OUTPUT); // Khai báo cổng Buzzer là đầu ra âm thanh
@@ -318,6 +304,7 @@ class Actuators {
 
   /**
    * @brief Xử lý phát tiếng bíp hoặc bài hát trên còi (Buzzer) từng bước một.
+   Cái hàm đầu buồi này sẽ luôn được gọi trong loop()
    */
   void updateBuzzer() {
     unsigned long now = millis();
@@ -358,26 +345,25 @@ class Actuators {
         else if (currentSong == 3) { melody = jingle_bells_melody; melodyLen = jingle_bells_length; tempo = jingle_bells_tempo; }
 
         if (melody && currentNoteIndex < melodyLen) {
+          // Tính toán độ dài nốt nhạc một lần duy nhất (mili-giây)
+          unsigned long noteDuration = (currentSong == 2)
+              ? melody[currentNoteIndex].duration
+              : 240000UL / (tempo * melody[currentNoteIndex].duration);
+
           if (!isSilentGap) {
-            // Bước 3.1: Phát nốt nhạc hiện tại (giữ trong 90% thời gian của nốt)
+            // Bước 3.1: Phát nốt nhạc hiện tại (giữ trong 90% thời gian)
             uint16_t pitch = melody[currentNoteIndex].pitch;
-            unsigned long noteDuration = (currentSong == 2)
-                ? melody[currentNoteIndex].duration                  // Bài Despacito đã có sẵn mili-giây
-                : 240000UL / (tempo * melody[currentNoteIndex].duration); // Các bài khác tính từ nhịp độ (tempo)
-
-            if (pitch > 0) playTone(pitch); else stopTone(); // Nốt lặng thì tắt còi im lặng
+            if (pitch > 0) playTone(pitch); else stopTone(); // Nốt lặng thì tắt còi
+            
             nextNoteTime = now + (unsigned long)(noteDuration * 0.9);
-            isSilentGap  = true; // Lần sau gọi update() sẽ tắt còi nghỉ lấy hơi
+            isSilentGap  = true; // Lần sau quay lại sẽ tắt còi để nghỉ nhịp
           } else {
-            // Bước 3.2: Nghỉ lấy hơi một tẹo (10% thời gian nốt) để các nốt không bị dính vào nhau
+            // Bước 3.2: Tắt còi nghỉ lấy hơi một tẹo (10% thời gian) để nốt nhạc tách biệt
             stopTone();
-            unsigned long noteDuration = (currentSong == 2)
-                ? melody[currentNoteIndex].duration
-                : 240000UL / (tempo * melody[currentNoteIndex].duration);
-
+            
             nextNoteTime = now + (unsigned long)(noteDuration * 0.1);
             isSilentGap  = false;
-            currentNoteIndex++; // Chuẩn bị cho nốt tiếp theo
+            currentNoteIndex++; // Chuyển sang nốt tiếp theo
           }
         } else {
           stopSong(); // Hát hết bài thì tự tắt nhạc
