@@ -1,57 +1,33 @@
-/**
- * @file songs.h
- * @brief Hộp nhạc của Robot - Nơi lưu trữ các nốt nhạc để Robot biết hát!
- *
- * Con có biết làm thế nào để robot hát được không?
- * Robot không nói được như chúng ta, nhưng nó có thể phát ra âm thanh bíp bíp.
- * Bằng cách thay đổi tần số (độ cao của tiếng bíp) và thời gian ngân dài ngắn khác nhau,
- * robot sẽ tạo nên những giai điệu bài hát cực kỳ ngộ nghĩnh.
- *
- * 1. CÁC NỐT NHẠC (#define NOTE_...):
- *    Giống như các phím trên đàn Piano. Tên như NOTE_C4 là nốt Đô, NOTE_D4 là nốt Rê...
- *    Con số đằng sau (như 262) là số lần không khí rung rinh trong 1 giây để tạo ra âm thanh đó.
- *    Số càng to thì tiếng bíp càng cao (như tiếng chim hót), số nhỏ thì tiếng càng trầm (như tiếng bò rống).
- *    Nốt REST nghĩa là "nghỉ" - robot sẽ im lặng một chút để lấy hơi.
- *
- * 2. CẤU TRÚC NỐT NHẠC (struct Note):
- *    Giống như một mảnh ghép Lego âm nhạc, gồm:
- *    - pitch: Nốt nhạc nào (tần số bao nhiêu)?
- *    - duration: Ngân trong bao lâu (độ dài nốt nhạc)?
- */
-
 #ifndef SONGS_H
 #define SONGS_H
 
 #include <Arduino.h>
 
-// ===================================================
-// ĐỊNH NGHĨA CÁC PHÍM ĐÀN (Tần số nốt nhạc)
-// ===================================================
-#define NOTE_C4  262  // Nốt Đô
-#define NOTE_CS4 277  // Nốt Đô thăng
-#define NOTE_D4  294  // Nốt Rê
-#define NOTE_DS4 311  // Nốt Rê thăng
-#define NOTE_E4  330  // Nốt Mi
-#define NOTE_F4  349  // Nốt Fa
-#define NOTE_FS4 370  // Nốt Fa thăng
-#define NOTE_G4  392  // Nốt Sol
-#define NOTE_GS4 415  // Nốt Sol thăng
-#define NOTE_A4  440  // Nốt La
-#define NOTE_AS4 466  // Nốt La thăng
-#define NOTE_B4  494  // Nốt Si
-#define NOTE_C5  523  // Nốt Đô (cao hơn)
+#define NOTE_C4  262
+#define NOTE_CS4 277
+#define NOTE_D4  294
+#define NOTE_DS4 311
+#define NOTE_E4  330
+#define NOTE_F4  349
+#define NOTE_FS4 370
+#define NOTE_G4  392
+#define NOTE_GS4 415
+#define NOTE_A4  440
+#define NOTE_AS4 466
+#define NOTE_B4  494
+#define NOTE_C5  523
 #define NOTE_CS5 554
-#define NOTE_D5  587  // Nốt Rê (cao)
+#define NOTE_D5  587
 #define NOTE_DS5 622
-#define NOTE_E5  659  // Nốt Mi (cao)
-#define NOTE_F5  698  // Nốt Fa (cao)
+#define NOTE_E5  659
+#define NOTE_F5  698
 #define NOTE_FS5 740
-#define NOTE_G5  784  // Nốt Sol (cao)
+#define NOTE_G5  784
 #define NOTE_GS5 831
-#define NOTE_A5  880  // Nốt La (cao)
+#define NOTE_A5  880
 #define NOTE_AS5 932
-#define NOTE_B5  988  // Nốt Si (cao)
-#define NOTE_C6  1047 // Nốt Đô (rất cao)
+#define NOTE_B5  988
+#define NOTE_C6  1047
 #define NOTE_CS6 1109
 #define NOTE_D6  1175
 #define NOTE_DS6 1245
@@ -63,7 +39,7 @@
 #define NOTE_A6  1760
 #define NOTE_AS6 1865
 #define NOTE_B6  1976
-#define NOTE_C7  2093 // Nốt Đô (siêu cao, như tiếng kính vỡ)
+#define NOTE_C7  2093
 #define NOTE_CS7 2217
 #define NOTE_D7  2349
 #define NOTE_DS7 2489
@@ -75,17 +51,13 @@
 #define NOTE_A7  3520
 #define NOTE_AS7 3729
 #define NOTE_B7  3951
-#define REST     0    // Nốt lặng (đứng yên không kêu)
+#define REST     0
 
-// ===================================================
-// MẢNH GHÉP NỐT NHẠC
-// ===================================================
 struct Note {
-  uint16_t pitch;    // Cao độ (robot kêu bíp ở tần số nào)
-  uint16_t duration; // Trường độ (robot giữ nốt đó trong bao lâu)
+  uint16_t pitch;
+  uint16_t duration;
 };
 
-// 1. Super Mario Theme (from mario.ino)
 const Note mario_melody[] = {
   {NOTE_E7, 12}, {NOTE_E7, 12}, {REST, 12}, {NOTE_E7, 12}, {REST, 12}, {NOTE_C7, 12}, {NOTE_E7, 12}, {REST, 12},
   {NOTE_G7, 12}, {REST, 12}, {REST, 12}, {REST, 12}, {NOTE_G6, 12}, {REST, 12}, {REST, 12}, {REST, 12},
@@ -101,7 +73,6 @@ const Note mario_melody[] = {
 const int mario_length = 78;
 const int mario_tempo = 150;
 
-// 2. Despacito (from Despacito.ino - durations in milliseconds)
 const Note despacito_melody[] = {
   {587, 799}, {554, 794}, {493, 309}, {369, 309}, {369, 155}, {369, 155}, {369, 155}, {369, 155},
   {369, 155}, {493, 155}, {493, 155}, {493, 155}, {493, 309}, {440, 155}, {493, 309}, {391, 464},
@@ -156,9 +127,8 @@ const Note despacito_melody[] = {
   {554, 155}, {369, 155}, {369, 309}, {369, 304}
 };
 const int despacito_length = 404;
-const int despacito_tempo = 100; // Unused for Despacito since duration is direct in ms
+const int despacito_tempo = 100;
 
-// 3. Jingle Bells (from jingle_bells.ino)
 const Note jingle_bells_melody[] = {
   {598, 4}, {598, 4}, {598, 4}, {0, 4}, {598, 4}, {598, 4}, {598, 4}, {0, 4},
   {598, 4}, {714, 4}, {476, 4}, {534, 4}, {598, 4}, {0, 4}, {632, 4}, {632, 4},
